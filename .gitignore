@@ -18,6 +18,9 @@ npm-debug.log*
 supabase/auditoria/*.local
 supabase/auditoria/conexion*
 
+# Respaldos de datos del negocio (nunca versionar)
+respaldo/
+
 # Sistema operativo / editor
 Thumbs.db
 desktop.ini
