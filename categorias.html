@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Categorias - Supli Motors</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+
+    <!-- Navbar -->
+    <header class="navbar">
+        <a href="inicio.html" class="brand-link">
+            <span class="logo-texto">Supli <span class="logo-acento">Motor's</span></span>
+        </a>
+
+        <nav class="nav-links">
+            <a href="inicio.html" class="nav-link">Inicio</a>
+            <a href="index.html" class="nav-link">Tienda</a>
+            <a href="categorias.html" class="nav-link active">Categorias</a>
+            <a href="contacto.html" class="nav-link">Contacto</a>
+        </nav>
+
+        <div class="header-buttons">
+            <button id="btn-nav-search" class="btn-icon-header" title="Buscar" aria-label="Buscar">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            </button>
+
+            <div class="user-menu-container">
+                <button id="btn-user-menu" class="btn-icon-header" title="Cuenta" aria-label="Cuenta">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                </button>
+                <div id="user-dropdown" class="user-dropdown">
+                    <div class="user-dropdown-header">
+                        <span id="dropdown-user-name">Invitado</span>
+                        <span id="dropdown-user-role" class="user-role-badge"></span>
+                    </div>
+                    <button id="dropdown-login" class="dropdown-item">Iniciar sesion</button>
+                    <button id="btn-modo-admin" class="dropdown-item" style="display:none;">Panel de administracion</button>
+                    <button id="dropdown-my-account" class="dropdown-item" style="display:none;">Mi cuenta</button>
+                    <button id="btn-logout-header" class="dropdown-item dropdown-item-danger" style="display:none;">Cerrar sesion</button>
+                </div>
+            </div>
+
+            <div class="carrito-icono-container" id="abrir-carrito" title="Carrito" aria-label="Carrito">
+                <span style="font-size: 0.875rem; cursor: pointer;">Carrito</span>
+                <span id="contador-productos">0</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Contenido principal -->
+    <main class="main-content categorias-page">
+
+        <!-- Breadcrumb -->
+        <div class="controles-interfaz">
+            <div class="controles-izquierda">
+                <nav class="breadcrumbs">
+                    <a href="inicio.html" class="breadcrumb-item">Inicio</a>
+                    <span class="breadcrumb-item active">Categorias</span>
+                </nav>
+            </div>
+        </div>
+
+        <!-- Hero / Titulo -->
+        <section class="categorias-hero">
+            <h1 class="categorias-titulo">Explorar Categorias</h1>
+            <p class="categorias-subtitulo">Encontra exactamente el repuesto que necesitas</p>
+        </section>
+
+        <!-- Buscador de categorias -->
+        <div class="categorias-search-wrapper">
+            <div class="categorias-search">
+                <svg class="categorias-search-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                <input 
+                    type="text" 
+                    id="categorias-search-input" 
+                    placeholder="Buscar categoria..."
+                    autocomplete="off"
+                >
+            </div>
+        </div>
+
+        <!-- Contador -->
+        <div id="categorias-contador" class="categorias-contador"></div>
+
+        <!-- Grid de categorias -->
+        <div id="categorias-grid" class="categorias-grid">
+            <div class="categorias-loading">
+                <div class="spinner"></div>
+                <p>Cargando categorias...</p>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Scripts -->
+    <script src="supabase-client.js"></script>
+    <script src="auth-service.js"></script>
+    <script src="category-service.js"></script>
+    <script src="categorias.js"></script>
+</body>
+</html>

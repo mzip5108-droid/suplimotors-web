@@ -1,0 +1,19 @@
+# Dependencias
+node_modules/
+
+# Temporales de la CLI de Supabase (contienen refs locales del proyecto)
+supabase/.temp/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Entorno
+.env
+.env.local
+
+# Sistema operativo / editor
+Thumbs.db
+desktop.ini
+.DS_Store
+*.swp
