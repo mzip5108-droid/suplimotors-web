@@ -25,6 +25,7 @@ import {
 // cliente al evaluarse) y con cargarAplicacion(), que da una instancia limpia
 // por test. AuthService si se comparte: es el mismo objeto que usa la app.
 const { AuthService } = await import("../js/servicios/auth-service.js");
+const { iniciarSesion } = await import("../js/catalogo/sesion.js");
 
 const tarjetas = () => [...document.querySelectorAll(".tarjeta-producto")];
 const textoDe = (selector) => {
@@ -258,7 +259,7 @@ test("al iniciar sesion se vuelven a pedir los datos del catalogo", async () => 
     try {
         document.querySelector("#login-usuario").value = "admin";
         document.querySelector("#login-password").value = "secreta";
-        await app.iniciarSesion();
+        await iniciarSesion();
     } finally {
         AuthService.login = loginOriginal;
     }
@@ -287,7 +288,7 @@ test("un login fallido muestra el error y deja el modal abierto", async () => {
     try {
         document.querySelector("#login-usuario").value = "admin";
         document.querySelector("#login-password").value = "mal";
-        await app.iniciarSesion();
+        await iniciarSesion();
     } finally {
         AuthService.login = loginOriginal;
     }

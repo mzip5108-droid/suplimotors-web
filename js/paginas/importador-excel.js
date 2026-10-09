@@ -1,11 +1,12 @@
 // ============================================
 // Importador de Excel: lectura, previsualizacion y volcado a Supabase
 // ============================================
-
-import { actualizarEstadisticasInventario, actualizarSelectCategorias, actualizarSelectMarcas, cargarProductosDesdeSupabase, renderizarListaCategoriasAdmin, renderizarListaMarcasAdmin, renderizarProductosConPaginacion } from "./catalogo.js";
 import { BrandService } from "../servicios/brand-service.js";
 import { CategoryService } from "../servicios/category-service.js";
 import { ExcelImportService } from "../servicios/excel-import-service.js";
+import { actualizarEstadisticasInventario, renderizarProductosConPaginacion } from "../catalogo/render.js";
+import { actualizarSelectCategorias, actualizarSelectMarcas, renderizarListaCategoriasAdmin, renderizarListaMarcasAdmin } from "../catalogo/admin.js";
+import { cargarProductosDesdeSupabase } from "../catalogo/datos.js";
 
 // Botón "+" para crear marca nueva
 export async function crearMarcaDesdeImportador() {

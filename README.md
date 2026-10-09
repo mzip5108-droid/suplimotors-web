@@ -63,8 +63,17 @@ js/
     product-service.js       productos, variantes, subida de imágenes
     excel-import-service.js  lectura de Excel y detección de columnas
     venta-service.js         registro de ventas y reporte de historial
+  catalogo/
+    estado.js                estado compartido (productos, carrito, filtros, sesión) + setters
+    render.js                tarjetas, paginación, contadores y breadcrumbs
+    filtros.js               búsqueda y filtros del catálogo
+    carrito.js               carrito, detalle de producto y pedido por WhatsApp
+    datos.js                 carga del catálogo desde Supabase
+    sesion.js                login, logout, permisos por rol y recuperación
+    admin.js                 panel: productos, categorías, marcas y Excel
+    ui.js                    tema, vista, dropdown de usuario y buscador
   paginas/
-    catalogo.js              controlador del catálogo (estado, filtros, carrito, admin, sesión)
+    catalogo.js              entrada de index.html: solo arranca la aplicación
     mensajes.js              panel: bandeja de contacto
     usuarios.js              panel: usuarios y perfiles
     clientes.js              panel: clientes (lee de Supabase)
@@ -98,13 +107,19 @@ npm run verify     # lint + integridad de módulos + tests
 |---|---|
 | `npm run lint` | ESLint (reglas recomendadas + `no-dupe-keys`, `no-redeclare`, `no-unreachable`, `eqeqeq`, `prefer-const`…) |
 | `npm run verificar:imports` | Que cada `import` apunte a un archivo existente **y a un export real**; que no haya nombres duplicados dentro de un mismo grafo de carga; que los `<script type="module">` de las vistas existan |
-| `npm test` | 17 tests de la lógica de negocio (precios, stock, detección de columnas, fallback de ventas) |
+| `npm test` | 32 tests: lógica de negocio (precios, stock, detección de columnas, fallback de ventas) y DOM real sobre `index.html` (render, escapado, filtros, paginación, carrito, login y paneles) |
 | `npm run format` | Prettier sobre `js/**` (el CSS y el HTML quedan fuera a propósito) |
 
 `verificar:imports` merece una aclaración: si un módulo importa un nombre que el
 otro archivo no exporta, el navegador rechaza la carga con
 *"does not provide an export named…"*. Es un error que ni el linter ni los tests
-unitarios detectan, y que ya apareció una vez durante la modularización.
+unitarios detectan, y que ya apareció una vez durante la modularización. La misma
+comprobación detecta referencias a `window.<export>`, que es como se rompieron
+las llamadas a `window.sb` al pasar los servicios a módulos.
+
+Los tests de DOM cargan el `index.html` **real** en jsdom y sustituyen Supabase
+por un doble controlable (respuestas por tabla, sesión, diálogos). Así se prueba
+el cableado de verdad, no una maqueta.
 
 > `node --test` (el runner por carpetas) lanza un proceso hijo por archivo y en
 > entornos con sandbox estricto eso falla con `EPERM`. Por eso `npm test`
@@ -163,22 +178,10 @@ Reglas de acceso principales:
 
 ## Deuda técnica conocida
 
-1. **`js/paginas/catalogo.js` sigue teniendo ~2.000 líneas.** Es el controlador
-   del catálogo y concentra el estado mutable compartido (productos, carrito,
-   filtros, sesión). Partirlo bien requiere un módulo de estado con setters
-   explícitos o un patrón de store, y tests que cubran el render con DOM. Se
-   dejó entero a propósito para no romper una aplicación en producción sin red
-   de seguridad.
-2. **Puentes `window.*`.** El carrito se pinta con `innerHTML` y usa
-   `onclick="quitarDelCarrito(...)"`, que se evalúa en el ámbito global. Mientras
-   esas plantillas no se migren a `addEventListener`, `catalogo.js` expone esas
-   funciones en `window`. Están marcadas con un comentario.
-3. **`js/lib/pdf-prototipo.js`** no lo carga ninguna vista y `pdf.js` ya no se
+1. **`js/lib/pdf-prototipo.js`** no lo carga ninguna vista y `pdf.js` ya no se
    incluye en `index.html`. Si se retoma la importación por PDF hay que volver a
    agregar el CDN (el comentario en `index.html` lo indica).
-4. **Sin tests de DOM.** Los tests cubren lógica pura y de servicios. El render y
-   los manejadores de eventos no están cubiertos.
-5. **La clave publicable está en el código.** Es correcto por diseño (es pública),
+2. **La clave publicable está en el código.** Es correcto por diseño (es pública),
    pero recuerda que **toda** la protección depende de RLS: si una política queda
    abierta, los datos quedan expuestos.
 
@@ -201,5 +204,8 @@ Resumen de los cambios grandes (el detalle está en el historial de git):
 - El importador de Excel intentaba **crear marcas duplicadas** en vez de reactivar
   las que estaban de baja, y elegía mal la columna de código.
 - Clientes y ventas dejaron de vivir **solo en el `localStorage`** del navegador.
-- Un monolito de 4.168 líneas y 7 scripts globales se convirtió en **19 módulos ES**
-  con verificación automática de integridad y 17 tests.
+- Un monolito de 4.168 líneas y 7 scripts globales se convirtió en **27 módulos ES**
+  (el controlador del catálogo pasó de 2.083 a 215 líneas, con el estado en su
+  propio módulo), con verificación automática de integridad y 32 tests.
+- **Se eliminaron todos los handlers inline y los puentes `window.*`**: ahora todo
+  se conecta con `addEventListener`.

@@ -1,11 +1,10 @@
 // ============================================
 // Panel de administracion: gestion de usuarios y perfiles
 // ============================================
-
 import { escapeAttr, escapeHtml } from "../lib/util.js";
-import { perfilActual } from "./catalogo.js";
 import { AuthService } from "../servicios/auth-service.js";
 import { sb } from "../servicios/supabase-client.js";
+import { perfilActual } from "../catalogo/estado.js";
 
 // ============================================
 // GESTIÓN DE USUARIOS (PANEL ADMIN)

@@ -187,6 +187,12 @@ let versionModulo = 0;
 export async function cargarAplicacion() {
     crearPagina();
     versionModulo++;
+
+    // El estado de los modulos de catalogo se comparte en todo el proceso, asi que
+    // hay que devolverlo a su valor inicial para que un test no herede el anterior.
+    const moduloEstado = await import("../js/catalogo/estado.js");
+    moduloEstado.reiniciarEstado();
+
     return await import(`../js/paginas/catalogo.js?v=${versionModulo}`);
 }
 
