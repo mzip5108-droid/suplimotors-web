@@ -56,11 +56,30 @@ const CategoryService = {
             // Verificar si ya existe
             const existente = await window.sb
                 .from("categorias")
-                .select("id, nombre, icono")
+                .select("id, nombre, icono, activa")
                 .ilike("nombre", nombre.trim())
                 .maybeSingle();
 
             if (existente.data) {
+                // Si existia dada de baja se reactiva en lugar de devolverla
+                // inactiva: si no, sus productos quedarian fuera del catalogo
+                // y del filtro por categoria.
+                if (existente.data.activa === false) {
+                    const { data: reactivada, error: errorReactivar } = await window.sb
+                        .from("categorias")
+                        .update({ activa: true })
+                        .eq("id", existente.data.id)
+                        .select()
+                        .single();
+
+                    if (errorReactivar) {
+                        return { ok: false, error: errorReactivar.message };
+                    }
+
+                    this._categorias.push(reactivada);
+                    return { ok: true, data: reactivada, reactivada: true };
+                }
+
                 return { ok: true, data: existente.data, yaExistia: true };
             }
 

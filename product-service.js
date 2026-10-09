@@ -69,23 +69,29 @@ const ProductService = {
     _adaptarProducto(p) {
         const variantesActivas = (p.variantes_producto || []).filter(v => v.activo !== false);
         const stockTotal = variantesActivas.reduce((sum, v) => sum + (v.stock || 0), 0);
-        
-        const varianteConPrecio = variantesActivas.find(v => v.precio);
-        const precio = varianteConPrecio ? varianteConPrecio.precio : p.precio_base;
+
+        // Precio de catalogo: el menor de las variantes con precio valido.
+        // Antes se tomaba la primera variante que tuviera precio, lo que hacia
+        // que el precio mostrado dependiera del orden que devolviera Postgres.
+        const preciosValidos = variantesActivas
+            .map(v => parseFloat(v.precio))
+            .filter(precio => Number.isFinite(precio) && precio > 0);
+        const precio = preciosValidos.length > 0
+            ? Math.min(...preciosValidos)
+            : parseFloat(p.precio_base || 0);
 
         return {
             id: p.id,
             codigo: p.codigo,
             nombre: p.nombre,
             descripcion: p.descripcion,
-            precio: parseFloat(precio || 0),
+            precio: Number.isFinite(precio) ? precio : 0,
             precio_base: parseFloat(p.precio_base || 0),
             stock: stockTotal,
             categoria: p.categorias ? p.categorias.id : null,
             categoria_nombre: p.categorias ? p.categorias.nombre : "Sin categoría",
             categoria_icono: p.categorias ? p.categorias.icono : "",
             marca: p.marcas ? p.marcas.nombre : null,
-            marca_id: p.marcas ? p.marcas.id : null,
             imagen: p.imagen_url,
             imagen_url: p.imagen_url,
             activo: p.activo,
@@ -94,7 +100,7 @@ const ProductService = {
             created_at: p.created_at,
             variantes: variantesActivas,
             categoria_id: p.categoria_id,
-            marca_id: p.marca_id
+            marca_id: p.marca_id || (p.marcas ? p.marcas.id : null)
         };
     },
 
@@ -164,13 +170,18 @@ const ProductService = {
 async crear(datos, archivoImagen = null) {
     try {
         // 1. Validaciones básicas
-        if (!datos.codigo || !datos.nombre || !datos.precio || !datos.categoria_id) {
+        const precio = parseFloat(datos.precio);
+        if (!datos.codigo || !datos.nombre || !datos.categoria_id) {
             return { ok: false, error: "Faltan campos obligatorios: código, nombre, precio, categoría" };
+        }
+        if (!Number.isFinite(precio) || precio <= 0) {
+            return { ok: false, error: "El precio debe ser un número mayor que cero" };
         }
         // Determinar si va activo o no (default: true)
         const activo = datos.activo !== undefined ? datos.activo : true;
-        // Determinar stock (default: 1)
-        const stock = datos.stock !== undefined ? parseInt(datos.stock) : 1;
+        // Determinar stock (default: 1; si viene inválido se guarda 0, nunca NaN)
+        const stockParseado = parseInt(datos.stock !== undefined ? datos.stock : 1, 10);
+        const stock = Number.isFinite(stockParseado) ? stockParseado : 0;
         // 2. Determinar la URL de imagen
         let imagenUrl = datos.imagen_url || null;
         if (archivoImagen) {
@@ -190,7 +201,7 @@ async crear(datos, archivoImagen = null) {
             const updateData = {
                 nombre: datos.nombre.trim(),
                 descripcion: datos.descripcion ? datos.descripcion.trim() : null,
-                precio_base: parseFloat(datos.precio),
+                precio_base: precio,
                 categoria_id: datos.categoria_id,
                 marca_id: datos.marca_id || null,
                 activo: activo
@@ -213,19 +224,36 @@ async crear(datos, archivoImagen = null) {
                 return { ok: false, error: errorUpdate.message };
             }
 
-            // Actualizar la variante (precio y stock)
-            if (existente.variantes_producto && existente.variantes_producto.length > 0) {
-                const variante = existente.variantes_producto[0];
+            // Actualizar la variante (precio y stock). Si el producto no tenia
+            // ninguna variante, se crea: antes el stock se perdia en silencio.
+            const variantes = existente.variantes_producto || [];
+            if (variantes.length > 0) {
                 const { error: errorVarUpdate } = await window.sb
                     .from("variantes_producto")
                     .update({
-                        precio: parseFloat(datos.precio),
+                        precio: precio,
                         stock: stock
                     })
-                    .eq("id", variante.id);
+                    .eq("id", variantes[0].id);
 
                 if (errorVarUpdate) {
                     console.warn("Error al actualizar variante:", errorVarUpdate);
+                }
+            } else {
+                const { error: errorVarInsert } = await window.sb
+                    .from("variantes_producto")
+                    .insert({
+                        producto_id: existente.id,
+                        sku: datos.codigo.trim(),
+                        atributos: {},
+                        precio: precio,
+                        stock: stock,
+                        stock_minimo: 5,
+                        activo: true
+                    });
+
+                if (errorVarInsert) {
+                    console.warn("Error al crear la variante faltante:", errorVarInsert);
                 }
             }
 
@@ -234,7 +262,7 @@ async crear(datos, archivoImagen = null) {
                 actualizado: true,
                 data: {
                     producto: productoActualizado,
-                    variante: existente.variantes_producto?.[0] || null
+                    variante: variantes[0] || null
                 }
             };
         }
@@ -244,7 +272,7 @@ async crear(datos, archivoImagen = null) {
             codigo: datos.codigo.trim(),
             nombre: datos.nombre.trim(),
             descripcion: datos.descripcion ? datos.descripcion.trim() : null,
-            precio_base: parseFloat(datos.precio),
+            precio_base: precio,
             categoria_id: datos.categoria_id,
             marca_id: datos.marca_id || null,
             imagen_url: imagenUrl,
@@ -269,7 +297,7 @@ async crear(datos, archivoImagen = null) {
             producto_id: producto.id,
             sku: datos.codigo.trim(),
             atributos: {},
-            precio: parseFloat(datos.precio),
+            precio: precio,
             stock: stock,
             stock_minimo: 5,
             activo: true

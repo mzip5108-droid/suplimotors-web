@@ -123,29 +123,60 @@ async leerExcel(archivo) {
 
     // ============================================
     // DETECTAR COLUMNAS
+    // Puntua cada encabezado segun lo especifico que sea para cada campo, de modo
+    // que "Codigo" gane a "Codigo de barras". Antes se usaba una cadena de
+    // else-if y ganaba la ultima columna que coincidiera, que solia ser la
+    // equivocada.
     // ============================================
 _detectarColumnas(encabezados) {
     const resultado = { codigo: null, nombre: null, precio: null, cantidad: null, marca: null, categoria: null };
     if (!Array.isArray(encabezados)) return resultado;
 
-    encabezados.forEach((enc, index) => {
-        if (!enc) return;
-        const texto = String(enc).toLowerCase().trim();
+    const campos = {
+        codigo: ["codigo", "código", "cod", "sku"],
+        cantidad: ["cantidad", "stock", "qty"],
+        marca: ["marca"],
+        categoria: ["categoria", "categoría"],
+        precio: ["precio", "pvp"],
+        nombre: ["nombre", "descrip", "producto", "detalle"]
+    };
 
-        if (texto.includes("codigo") || texto.includes("código") || texto === "cod") {
-            resultado.codigo = index;
-        } else if (texto.includes("cantidad") || texto.includes("stock") || texto.includes("qty")) {
-            resultado.cantidad = index;
-        } else if (texto.includes("marca")) {
-            resultado.marca = index;
-        } else if (texto.includes("categoria") || texto.includes("categoría")) {
-            resultado.categoria = index;
-        } else if (texto.includes("precio") || texto.includes("pvp")) {
-            resultado.precio = index;
-        } else if (texto.includes("descrip") || texto.includes("nombre") || texto.includes("producto")) {
-            resultado.nombre = index;
+    // Coincidencia exacta = 3, empieza por = 2, contiene = 1
+    const puntuar = (encabezado, claves) => {
+        let mejor = 0;
+        for (const clave of claves) {
+            if (encabezado === clave) mejor = Math.max(mejor, 3);
+            else if (encabezado.startsWith(clave)) mejor = Math.max(mejor, 2);
+            else if (encabezado.includes(clave)) mejor = Math.max(mejor, 1);
         }
-    });
+        return mejor;
+    };
+
+    // Una misma columna no puede asignarse a dos campos
+    const usadas = new Set();
+
+    for (const [campo, claves] of Object.entries(campos)) {
+        let mejorPuntaje = 0;
+        let mejorIndice = null;
+
+        encabezados.forEach((enc, indice) => {
+            if (!enc || usadas.has(indice)) return;
+            const texto = String(enc).toLowerCase().trim();
+            if (!texto) return;
+
+            const puntaje = puntuar(texto, claves);
+            // A igual puntaje se queda con la columna mas a la izquierda
+            if (puntaje > mejorPuntaje) {
+                mejorPuntaje = puntaje;
+                mejorIndice = indice;
+            }
+        });
+
+        if (mejorIndice !== null) {
+            resultado[campo] = mejorIndice;
+            usadas.add(mejorIndice);
+        }
+    }
 
     return resultado;
 },
@@ -203,62 +234,39 @@ obtenerTodosLosProductos() {
 
     // ============================================
     // OBTENER O CREAR MARCA
+    // Delega en BrandService, que ademas reactiva una marca que estuviera dada
+    // de baja. Antes se insertaba directamente y, si la marca existia inactiva,
+    // se intentaba crear un duplicado (violando el indice unico).
     // ============================================
 async _obtenerOCrearMarca(nombre) {
-    if (!nombre || nombre === "Sin marca" || nombre === "") {
-        nombre = "Sin marca";
-    }
-    
-    const marcasCache = window.BrandService.getCache();
-    const existente = marcasCache.find(m => 
-        m.nombre.toLowerCase() === nombre.toLowerCase()
-    );
-    if (existente) return existente.id;
-    
-    const { data, error } = await window.sb
-        .from("marcas")
-        .insert({ nombre: nombre.trim(), activa: true })
-        .select()
-        .single();
-    
-    if (error) {
-        console.warn("Error al crear marca:", error);
+    const nombreLimpio = !nombre || !String(nombre).trim() ? "Sin marca" : String(nombre).trim();
+
+    const resultado = await window.BrandService.obtenerOCrear(nombreLimpio);
+
+    if (!resultado.ok || !resultado.data) {
+        console.warn("No se pudo obtener ni crear la marca:", nombreLimpio, resultado.error);
         return null;
     }
-    
-    marcasCache.push(data);
-    return data.id;
+
+    return resultado.data.id;
 },
     // ============================================
     // OBTENER O CREAR CATEGORÍA
+    // Igual que las marcas: usa CategoryService, que reactiva la categoria si
+    // estaba dada de baja.
     // ============================================
 async _obtenerOCrearCategoria(nombre) {
-    // Si no hay nombre o es "Otros"/"Sin categoría", usar categoría por defecto
-    if (!nombre || nombre === "Otros" || nombre === "Sin categoría" || nombre === "") {
-        nombre = "Sin categoría";
-    }
-    
-    // Buscar en cache
-    const categoriasCache = window.CategoryService.getCache();
-    const existente = categoriasCache.find(c => 
-        c.nombre.toLowerCase() === nombre.toLowerCase()
-    );
-    if (existente) return existente.id;
-    
-    // Crear en Supabase
-    const { data, error } = await window.sb
-        .from("categorias")
-        .insert({ nombre: nombre.trim(), icono: "", activa: true })
-        .select()
-        .single();
-    
-    if (error) {
-        console.warn("Error al crear categoría:", error);
+    const limpio = String(nombre || "").trim();
+    const nombreLimpio = !limpio || limpio === "Otros" ? "Sin categoría" : limpio;
+
+    const resultado = await window.CategoryService.obtenerOCrear(nombreLimpio);
+
+    if (!resultado.ok || !resultado.data) {
+        console.warn("No se pudo obtener ni crear la categoría:", nombreLimpio, resultado.error);
         return null;
     }
-    
-    categoriasCache.push(data);
-    return data.id;
+
+    return resultado.data.id;
 },
 
     // ============================================

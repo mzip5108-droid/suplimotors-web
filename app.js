@@ -1,5 +1,5 @@
 let productos = JSON.parse(localStorage.getItem("supli_motors_productos")) || [];
-let categorias = JSON.parse(localStorage.getItem("supli_motors_categorias")) || [
+const categorias = JSON.parse(localStorage.getItem("supli_motors_categorias")) || [
     { id: "motor", nombre: "Motor", icono: "M" },
     { id: "transmision", nombre: "Transmision", icono: "T" },
     { id: "frenos", nombre: "Frenos", icono: "F" },
@@ -976,8 +976,8 @@ function importarInventarioExcel(file) {
                 "Presiona Cancelar para AGREGAR a los productos existentes."
             );
 
-            let productosImportados = [];
-            let errores = [];
+            const productosImportados = [];
+            const errores = [];
             
             datosImportados.forEach((row, index) => {
                 try {
@@ -1079,7 +1079,7 @@ function inicializarExcel() {
 // ============================================
 // VARIABLES DE CLIENTES Y SISTEMA
 // ============================================
-let clientes = JSON.parse(localStorage.getItem("supli_motors_clientes")) || [];
+const clientes = JSON.parse(localStorage.getItem("supli_motors_clientes")) || [];
 let clienteEditando = null;
 
 
@@ -1591,7 +1591,7 @@ function renderizarTopProductos(ventasPorProducto) {
 let temaActual = localStorage.getItem('supli_motors_tema') || 'claro';
 let vistaActual = localStorage.getItem('supli_motors_vista') || 'grilla';
 let paginaActual = 1;
-let productosPorPagina = 24;
+const productosPorPagina = 24;
 let productosFiltradosCache = [];
 
 // ============================================
@@ -2417,7 +2417,7 @@ function renderizarTablaImportar(hojas) {
         datalist.innerHTML = listaCategorias;
     }
 
-    let indexGlobal = 0;
+    const indexGlobal = 0;
 
     // Recorrer todas las hojas
     hojas.forEach((hoja) => {
@@ -3000,6 +3000,12 @@ function escapeHtml(texto) {
     const div = document.createElement('div');
     div.textContent = String(texto);
     return div.innerHTML;
+}
+
+// Igual que escapeHtml pero ademas neutraliza las comillas, para poder
+// interpolar el valor dentro de un atributo HTML entrecomillado.
+function escapeAttr(texto) {
+    return escapeHtml(texto).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 // ============================================
 // FUNCIONES FALTANTES — IMPORTADOR Y ADMIN
@@ -3626,7 +3632,7 @@ function abrirEdicionUsuario(perfil, cliente) {
     body.innerHTML = `
         <div class="editar-usuario-campo">
             <label>Email real</label>
-            <input type="email" id="edit-email-real" value="${escapeHtml(emailReal)}" placeholder="cliente@ejemplo.com">
+            <input type="email" id="edit-email-real" value="${escapeAttr(emailReal)}" placeholder="cliente@ejemplo.com">
             <small style="color:#94a3b8; font-size:0.75rem; margin-top:4px;">
                 Email de contacto (no cambia el usuario de acceso)
             </small>
@@ -3635,12 +3641,12 @@ function abrirEdicionUsuario(perfil, cliente) {
         ${perfil.rol === 'cliente' ? `
             <div class="editar-usuario-campo">
                 <label>Teléfono</label>
-                <input type="tel" id="edit-telefono" value="${escapeHtml(telefono)}" placeholder="Ej: 0412-1234567">
+                <input type="tel" id="edit-telefono" value="${escapeAttr(telefono)}" placeholder="Ej: 0412-1234567">
             </div>
 
             <div class="editar-usuario-campo">
                 <label>Dirección</label>
-                <input type="text" id="edit-direccion" value="${escapeHtml(direccion)}" placeholder="Dirección completa">
+                <input type="text" id="edit-direccion" value="${escapeAttr(direccion)}" placeholder="Dirección completa">
             </div>
         ` : ''}
 
