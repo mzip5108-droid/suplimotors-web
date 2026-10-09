@@ -41,6 +41,33 @@ Antes de aplicarlo: **hacé una copia de seguridad** y probalo primero en un
 proyecto de prueba. Crea las tablas `ventas` y `venta_items`, que son las que
 todavía no existen.
 
+### Puesta en producción de la migración
+
+**Por qué urge:** una auditoría con la clave publicable (la que está en el
+JavaScript del sitio, visible para cualquier visitante) confirmó que el catálogo
+se puede leer **sin sesión**: `productos` devolvía 2.994 filas, `variantes_producto`
+4.293, `categorias` 126 y `marcas` 28. Los datos personales (`perfiles`,
+`clientes`, `mensajes_contacto`) sí estaban protegidos. La migración cierra ese
+agujero con políticas `to authenticated`.
+
+Pasos:
+
+1. **Copia de seguridad** desde el panel de Supabase (*Database → Backups*).
+2. Pegar `0001_esquema_inicial.sql` completo en el **SQL Editor** y ejecutar.
+3. Verificar que la aplicación sigue funcionando: iniciar sesión, ver el catálogo,
+abrir el panel y **enviar el formulario de contacto** (su política de inserción
+anónima tiene que seguir viva).
+4. Repetir la auditoría: `node tools/auditoria.cjs --solo-api`. Las cuatro tablas
+del catálogo deben pasar a `0` filas visibles sin sesión.
+
+Si algo se rompe, `0001_reversion.sql` devuelve el acceso en segundos. **No toca
+`perfiles`, `clientes` ni `mensajes_contacto`**: esas tablas ya tenían RLS y
+desactivarlo expondría datos personales.
+
+Para auditar y medir con datos reales hay un rol de solo lectura en
+`supabase/auditoria/rol-solo-lectura.sql`, y el informe se genera con
+`node tools/auditoria.cjs`.
+
 ---
 
 ## Estructura

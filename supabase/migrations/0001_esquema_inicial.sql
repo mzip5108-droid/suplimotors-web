@@ -472,12 +472,13 @@ declare
 begin
     v_nombre := nullif(btrim(coalesce(new.raw_user_meta_data ->> 'nombre', '')), '');
     v_email  := new.email;
-    v_rol    := lower(btrim(coalesce(new.raw_user_meta_data ->> 'rol', '')));
-
-    -- Rol por defecto y validación contra la lista permitida
-    if v_rol is null or v_rol not in ('cliente', 'admin', 'superusuario') then
-        v_rol := 'cliente';
-    end if;
+    -- El rol NO se toma del cliente. El endpoint de registro
+    -- (POST /auth/v1/signup) es publico: cualquiera con la clave publicable
+    -- podria enviar data: { rol: 'admin' } y crearse un administrador.
+    -- Todo usuario nuevo nace como 'cliente'. Para crear administradores esta
+    -- la Edge Function admin-create-user, que corre con service_role y
+    -- actualiza el perfil despues de crear el usuario.
+    v_rol    := 'cliente';
 
     insert into public.perfiles (id, nombre, email, rol, activo, created_at)
     values (new.id, v_nombre, v_email, v_rol, true, now())
@@ -856,7 +857,16 @@ drop policy if exists "venta_items_insert_autenticados" on public.venta_items;
 create policy "venta_items_insert_autenticados"
     on public.venta_items for insert
     to authenticated
-    with check (true);
+    with check (
+        -- Solo se pueden agregar items a una venta propia, o siendo admin.
+        -- Antes esta politica no verificaba nada.
+        exists (
+            select 1
+            from public.ventas v
+            where v.id = venta_id
+              and (v.creado_por = auth.uid() or (select public.es_admin()))
+        )
+    );
 
 drop policy if exists "venta_items_select_propios" on public.venta_items;
 create policy "venta_items_select_propios"

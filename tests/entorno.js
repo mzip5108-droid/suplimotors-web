@@ -56,6 +56,9 @@ function crearConsulta(tabla) {
     estado.consultas.push(registro);
 
     const ops = { filtros: [], orden: [], desde: null, hasta: null, limite: null, contar: false, pideUno: false };
+    // Se asigna una sola vez, pero el manejador del Proxy se referencia a si
+    // mismo para poder encadenar, asi que no puede ser const en la declaracion.
+    // eslint-disable-next-line prefer-const
     let proxy;
 
     const valorDe = (fila, columna) =>
