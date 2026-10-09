@@ -5,6 +5,7 @@
 import { escapeAttr, escapeHtml } from "../lib/util.js";
 import { perfilActual } from "./catalogo.js";
 import { AuthService } from "../servicios/auth-service.js";
+import { sb } from "../servicios/supabase-client.js";
 
 // ============================================
 // GESTIÓN DE USUARIOS (PANEL ADMIN)
@@ -20,7 +21,7 @@ export async function cargarUsuarios() {
     tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:30px; color:#94a3b8;">Cargando usuarios...</td></tr>';
 
     try {
-        const { data, error } = await window.sb
+        const { data, error } = await sb
             .from('perfiles')
             .select('*')
             .order('nombre', { ascending: true });
@@ -117,7 +118,7 @@ export async function toggleActivoUsuario(id, estaActivo) {
     if (!confirm(`¿${accion.charAt(0).toUpperCase() + accion.slice(1)} este usuario?`)) return;
 
     try {
-        const { error } = await window.sb
+        const { error } = await sb
             .from('perfiles')
             .update({ activo: !estaActivo })
             .eq('id', id);
@@ -351,7 +352,7 @@ modal.style.visibility = 'visible';
 modal.style.animation = 'none'
     try {
 // 1. Obtener perfil
-const { data: perfil, error: perfilError } = await window.sb
+const { data: perfil, error: perfilError } = await sb
     .from('perfiles')
     .select('*')
     .eq('id', id)
@@ -369,7 +370,7 @@ if (perfilError || !perfil) {
         // 2. Obtener datos de cliente (si aplica)
         let cliente = null;
         if (perfil.rol === 'cliente') {
-            const { data: clienteData } = await window.sb
+            const { data: clienteData } = await sb
                 .from('clientes')
                 .select('*')
                 .eq('id', id)
@@ -591,7 +592,7 @@ export async function guardarEdicionUsuario(perfil, cliente) {
     try {
         // 1. Actualizar email en perfiles (si tiene email real)
         if (emailReal !== (perfil.email || '')) {
-            const { error: errorPerfil } = await window.sb
+            const { error: errorPerfil } = await sb
                 .from('perfiles')
                 .update({ email: emailReal || perfil.email })
                 .eq('id', perfil.id);
@@ -603,7 +604,7 @@ export async function guardarEdicionUsuario(perfil, cliente) {
 
         // 2. Actualizar datos en la tabla clientes (si es cliente)
         if (perfil.rol === 'cliente') {
-            const { error: errorCliente } = await window.sb
+            const { error: errorCliente } = await sb
                 .from('clientes')
                 .update({
                     telefono: telefono || null,

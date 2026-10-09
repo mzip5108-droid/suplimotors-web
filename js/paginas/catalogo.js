@@ -14,6 +14,7 @@ import { BrandService } from "../servicios/brand-service.js";
 import { CategoryService } from "../servicios/category-service.js";
 import { ProductService } from "../servicios/product-service.js";
 import { VentaService } from "../servicios/venta-service.js";
+import { sb } from "../servicios/supabase-client.js";
 
 export let productos = JSON.parse(localStorage.getItem("supli_motors_productos")) || [];
 
@@ -276,7 +277,7 @@ export async function eliminarMarca(id) {
     }
     
     try {
-        const { error } = await window.sb
+        const { error } = await sb
             .from('marcas')
             .update({ activa: false })
             .eq('id', id);
@@ -375,8 +376,8 @@ export function actualizarCarrito() {
     
     const totalPago = document.getElementById("total-pago");
     const contador = document.getElementById("contador-productos");
-    if (totalPago) totalPago.innerText = total.toFixed(2);
-    if (contador) contador.innerText = items;
+    if (totalPago) totalPago.textContent = total.toFixed(2);
+    if (contador) contador.textContent = items;
 }
 
 export function quitarDelCarrito(index) {
@@ -398,7 +399,7 @@ export async function eliminarProducto(id) {
 
     try {
         // 1. Borrar variantes primero
-        const { error: errorVariantes } = await window.sb
+        const { error: errorVariantes } = await sb
             .from('variantes_producto')
             .delete()
             .eq('producto_id', id);
@@ -408,7 +409,7 @@ export async function eliminarProducto(id) {
         }
 
         // 2. Borrar el producto
-        const { error } = await window.sb
+        const { error } = await sb
             .from('productos')
             .delete()
             .eq('id', id);
@@ -440,7 +441,7 @@ export async function eliminarCategoria(id) {
     }
     
     try {
-        const { error } = await window.sb
+        const { error } = await sb
             .from('categorias')
             .update({ activa: false })
             .eq('id', id);
@@ -476,11 +477,11 @@ export function abrirDetalle(producto) {
     document.getElementById("input-cantidad").value = cantidadSeleccionada;
     document.getElementById("detalle-img").src =
         producto.imagen || getImagenMarca(producto.marca) || PLACEHOLDER_IMG;
-    document.getElementById("detalle-nombre").innerText = producto.nombre;
+    document.getElementById("detalle-nombre").textContent = producto.nombre;
     document.getElementById("detalle-codigo").textContent = `Cod: ${producto.codigo || ""}`;
     document.getElementById("detalle-categoria").textContent = `${categoriaIcono} ${categoriaNombre}`.trim();
-    document.getElementById("detalle-desc").innerText = producto.descripcion || "Sin descripcion disponible";
-    document.getElementById("detalle-precio").innerText = parseFloat(producto.precio).toFixed(2);
+    document.getElementById("detalle-desc").textContent = producto.descripcion || "Sin descripcion disponible";
+    document.getElementById("detalle-precio").textContent = parseFloat(producto.precio).toFixed(2);
     
     if (document.getElementById("detalle-marca")) {
         document.getElementById("detalle-marca").textContent = producto.marca ? `Marca: ${producto.marca}` : '';
@@ -718,7 +719,9 @@ export function activarPestanaAdmin(tabId) {
         cargarUsuarios();
     }
     if (tabId === 'clientes') {
-        cargarClientes().then(renderizarClientes);
+        // Ojo: pasar la funcion directo a .then haria que reciba la respuesta
+        // como primer argumento, y se usaria como filtro de busqueda.
+        cargarClientes().then(() => renderizarClientes());
     }
 }
 
@@ -1973,7 +1976,7 @@ export async function enviarEmailRecuperacion() {
     btn.textContent = 'Enviando...';
     
     try {
-        const { error } = await window.sb.auth.resetPasswordForEmail(email, {
+        const { error } = await sb.auth.resetPasswordForEmail(email, {
             redirectTo: window.location.origin + '/reset-password.html'
         });
         
@@ -2048,7 +2051,7 @@ export async function privatizarProducto(id) {
 
     try {
         // 1. Actualizar en Supabase: activo = false
-        const { error } = await window.sb
+        const { error } = await sb
             .from('productos')
             .update({ activo: false })
             .eq('id', id);

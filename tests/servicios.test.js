@@ -1,41 +1,16 @@
 // ============================================
 // Tests de la logica de negocio que no depende del DOM
-// Se ejecutan con: npm test  (runner nativo de Node, sin dependencias)
-//
-// Los modulos son ES y de navegador, asi que antes de importarlos se instalan
-// stubs minimos de `window`, `localStorage` y del cliente de Supabase.
+// Comparten entorno con los tests de DOM (tests/entorno.js), asi que el doble de
+// Supabase es el mismo y se controla desde `estado`.
 // ============================================
 
 import test from "node:test";
 import assert from "node:assert/strict";
 
-// ---------------------------------------------------------------- stubs
-let respuestaSupabase = { data: null, error: { message: "tabla inexistente" } };
-let historialLocal = null;
+import { estado } from "./entorno.js";
 
-const clienteSupabaseFalso = {
-    from() {
-        return {
-            select: () => ({ order: async () => respuestaSupabase }),
-            insert: () => ({ select: () => ({ single: async () => respuestaSupabase }) }),
-            update: () => ({ eq: async () => respuestaSupabase }),
-            delete: () => ({ eq: async () => respuestaSupabase })
-        };
-    },
-    auth: {
-        getSession: async () => ({ data: { session: null } })
-    }
-};
-
-globalThis.window = globalThis.window || {};
-globalThis.window.supabase = { createClient: () => clienteSupabaseFalso };
-globalThis.localStorage = {
-    getItem: (clave) => (clave === "supli_motors_historial" ? historialLocal : null),
-    setItem: () => {},
-    removeItem: () => {}
-};
-
-// ---------------------------------------------------------------- imports
+// Los modulos se importan DESPUES del entorno: supabase-client.js crea el
+// cliente al evaluarse y tiene que encontrar ya el doble instalado.
 const { ProductService } = await import("../js/servicios/product-service.js");
 const { ExcelImportService } = await import("../js/servicios/excel-import-service.js");
 const { VentaService } = await import("../js/servicios/venta-service.js");
@@ -86,7 +61,12 @@ test("detecta las columnas tipicas de una planilla", () => {
 });
 
 test("prefiere 'Codigo' antes que 'Codigo de barras'", () => {
-    const columnas = ExcelImportService._detectarColumnas(["Codigo de barras", "Codigo", "Producto", "PVP"]);
+    const columnas = ExcelImportService._detectarColumnas([
+        "Codigo de barras",
+        "Codigo",
+        "Producto",
+        "PVP"
+    ]);
     assert.equal(columnas.codigo, 1, "debe elegir la coincidencia exacta");
     assert.equal(columnas.nombre, 2);
     assert.equal(columnas.precio, 3);
@@ -195,7 +175,8 @@ test("no registra una venta sin items", async () => {
 });
 
 test("el historial usa Supabase cuando esta disponible", async () => {
-    respuestaSupabase = {
+    estado.reiniciar();
+    estado.porTabla.ventas = {
         error: null,
         data: [
             {
@@ -219,15 +200,20 @@ test("el historial usa Supabase cuando esta disponible", async () => {
 });
 
 test("el historial cae al respaldo del navegador si la tabla no existe", async () => {
-    respuestaSupabase = { data: null, error: { message: 'relation "ventas" does not exist' } };
-    historialLocal = JSON.stringify([
-        {
-            cedula: "123",
-            total: "50",
-            fecha: "1/1/2025",
-            carrito: [{ nombre: "Bujia", cantidad: 2, precio: 25 }]
-        }
-    ]);
+    estado.reiniciar();
+    // Sin fixture para `ventas`: el doble responde el error por defecto
+    localStorage.clear();
+    localStorage.setItem(
+        "supli_motors_historial",
+        JSON.stringify([
+            {
+                cedula: "123",
+                total: "50",
+                fecha: "1/1/2025",
+                carrito: [{ nombre: "Bujia", cantidad: 2, precio: 25 }]
+            }
+        ])
+    );
 
     const resultado = await VentaService.historial();
     assert.equal(resultado.origen, "local");

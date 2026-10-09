@@ -116,6 +116,32 @@ for (const vista of fs.readdirSync(raiz).filter((f) => f.endsWith(".html"))) {
     }
 }
 
+// Referencias a un servicio a traves de window: al pasar de scripts clasicos a
+// modulos, window.sb dejo de existir y estas llamadas fallan en tiempo de
+// ejecucion. ESLint no las ve, porque es un acceso a propiedad.
+const nombresExportados = new Set();
+for (const conjunto of exportados.values()) {
+    for (const nombre of conjunto) nombresExportados.add(nombre);
+}
+
+const esPuente = (linea, nombre) => new RegExp('window\\.' + nombre + '\\s*=').test(linea);
+
+for (const archivo of archivos) {
+    const rel = path.relative(raiz, archivo).split(path.sep).join('/');
+    fs.readFileSync(archivo, 'utf8')
+        .split(/\r?\n/)
+        .forEach((linea, i) => {
+            for (const m of linea.matchAll(/window\.(\w+)/g)) {
+                const nombre = m[1];
+                if (!nombresExportados.has(nombre)) continue;
+                if (esPuente(linea, nombre)) continue;
+                problemas.push(
+                    rel + ':' + (i + 1) + ' usa window.' + nombre + ', que ya no se expone: hay que importarlo'
+                );
+            }
+        });
+}
+
 // Ademas, cada <script type="module" src="..."> de las vistas debe existir
 for (const vista of fs.readdirSync(raiz).filter((f) => f.endsWith(".html"))) {
     const contenido = fs.readFileSync(path.join(raiz, vista), "utf8");

@@ -3,6 +3,7 @@
 // ============================================
 
 import { escapeHtml } from "../lib/util.js";
+import { sb } from "../servicios/supabase-client.js";
 
 // ============================================
 // MENSAJES DE CONTACTO (PANEL ADMIN)
@@ -18,7 +19,7 @@ export async function cargarMensajes() {
     lista.innerHTML = '<p style="text-align:center; color:#94a3b8; padding:40px;">Cargando mensajes...</p>';
     
     try {
-        const { data, error } = await window.sb
+        const { data, error } = await sb
             .from('mensajes_contacto')
             .select('*')
             .order('created_at', { ascending: false });
@@ -127,7 +128,7 @@ export function renderizarMensajes() {
 
 export async function marcarMensajeComoLeido(id) {
     try {
-        const { error } = await window.sb
+        const { error } = await sb
             .from('mensajes_contacto')
             .update({ leido: true })
             .eq('id', id);
@@ -153,7 +154,7 @@ export async function eliminarMensaje(id) {
     if (!confirm('¿Eliminar este mensaje permanentemente?')) return;
     
     try {
-        const { error } = await window.sb
+        const { error } = await sb
             .from('mensajes_contacto')
             .delete()
             .eq('id', id);

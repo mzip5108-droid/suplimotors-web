@@ -72,12 +72,12 @@ export default [
         rules: REGLAS
     },
     {
-        // Tests: corren en Node, con stubs de navegador
+        // Tests: corren en Node, pero montan un DOM con jsdom y usan sus globals
         files: ["tests/**/*.js"],
         languageOptions: {
             ecmaVersion: 2023,
             sourceType: "module",
-            globals: { ...globals.node }
+            globals: { ...globals.node, ...globals.browser }
         },
         rules: REGLAS
     },
