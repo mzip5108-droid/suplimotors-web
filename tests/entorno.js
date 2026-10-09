@@ -55,40 +55,155 @@ function crearConsulta(tabla) {
     const registro = { tabla, pasos: [] };
     estado.consultas.push(registro);
 
+    const ops = { filtros: [], orden: [], desde: null, hasta: null, limite: null, contar: false, pideUno: false };
+    let proxy;
+
+    const valorDe = (fila, columna) =>
+        columna.split(".").reduce((valor, parte) => (valor == null ? valor : valor[parte]), fila);
+
+    const aRegex = (patron) =>
+        new RegExp(
+            "^" +
+                String(patron)
+                    .replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+                    .replace(/%/g, ".*")
+                    .replace(/_/g, ".") +
+                "$",
+            "i"
+        );
+
+    const comparadores = {
+        eq: (a, b) => String(a) === String(b),
+        neq: (a, b) => String(a) !== String(b),
+        gt: (a, b) => Number(a) > Number(b),
+        gte: (a, b) => Number(a) >= Number(b),
+        lt: (a, b) => Number(a) < Number(b),
+        lte: (a, b) => Number(a) <= Number(b),
+        like: (a, b) => aRegex(b).test(String(a)),
+        ilike: (a, b) => aRegex(b).test(String(a)),
+        is: (a, b) => (b === null ? a === null || a === undefined : a === b),
+        in: (a, b) => b.map(String).includes(String(a))
+    };
+
+    const agregarFiltro = (tipo, columna, valor) => {
+        ops.filtros.push({ aplicar: (fila) => comparadores[tipo](valorDe(fila, columna), valor) });
+    };
+
+    // PostgREST: or("nombre.ilike.%x%,codigo.ilike.%x%")
+    const agregarOr = (expresion) => {
+        const partes = String(expresion).split(",").map((parte) => {
+            const [columna, tipo, ...resto] = parte.split(".");
+            return { columna, tipo, valor: resto.join(".") };
+        });
+        ops.filtros.push({
+            aplicar: (fila) =>
+                partes.some((p) => comparadores[p.tipo] && comparadores[p.tipo](valorDe(fila, p.columna), p.valor))
+        });
+    };
+
     const responder = () => {
         const bruto = estado.porTabla[tabla] || estado.generica;
         if (!bruto || bruto.error) return bruto;
 
-        const pideUno = registro.pasos.some(
-            ([metodo]) => metodo === "single" || metodo === "maybeSingle"
-        );
-        const datos = bruto.data;
+        let filas = Array.isArray(bruto.data) ? [...bruto.data] : bruto.data ? [bruto.data] : [];
 
-        if (pideUno && Array.isArray(datos)) return { ...bruto, data: datos[0] || null };
-        if (!pideUno && datos && !Array.isArray(datos)) return { ...bruto, data: [datos] };
-        return bruto;
+        for (const filtro of ops.filtros) filas = filas.filter(filtro.aplicar);
+        const total = filas.length;
+
+        for (const criterio of [...ops.orden].reverse()) {
+            filas.sort((a, b) => {
+                const x = valorDe(a, criterio.columna);
+                const y = valorDe(b, criterio.columna);
+                if (x === y) return 0;
+                const comparacion = x > y ? 1 : -1;
+                return criterio.ascending ? comparacion : -comparacion;
+            });
+        }
+
+        if (ops.desde !== null) {
+            filas = filas.slice(ops.desde, (ops.hasta === null ? filas.length - 1 : ops.hasta) + 1);
+        } else if (ops.limite !== null) {
+            filas = filas.slice(0, ops.limite);
+        }
+
+        const data = ops.pideUno ? filas[0] || null : filas;
+        // Cuantas filas devolvio esta consulta: es lo que permite medir en los
+        // tests el costo real de cada carga.
+        registro.devuelve = Array.isArray(data) ? data.length : data ? 1 : 0;
+        const salida = { ...bruto, data };
+        if (ops.contar) salida.count = total;
+        return salida;
     };
 
-    const consulta = new Proxy(
+    const metodos = {
+        select: (_columnas, opciones) => {
+            if (opciones && opciones.count === "exact") ops.contar = true;
+            return proxy;
+        },
+        order: (columna, opciones) => {
+            ops.orden.push({ columna, ascending: !opciones || opciones.ascending !== false });
+            return proxy;
+        },
+        range: (a, b) => {
+            ops.desde = a;
+            ops.hasta = b;
+            return proxy;
+        },
+        limit: (n) => {
+            ops.limite = n;
+            return proxy;
+        },
+        single: () => {
+            ops.pideUno = true;
+            return proxy;
+        },
+        maybeSingle: () => {
+            ops.pideUno = true;
+            return proxy;
+        },
+        or: (expresion) => {
+            agregarOr(expresion);
+            return proxy;
+        },
+        not: (columna, tipo, valor) => {
+            ops.filtros.push({
+                aplicar: (fila) => !comparadores[tipo](valorDe(fila, columna), valor)
+            });
+            return proxy;
+        }
+    };
+
+    for (const tipo of Object.keys(comparadores)) {
+        metodos[tipo] = (columna, valor) => {
+            agregarFiltro(tipo, columna, valor);
+            return proxy;
+        };
+    }
+
+    proxy = new Proxy(
         {},
         {
             get(_destino, propiedad) {
                 if (typeof propiedad === "symbol") return undefined;
                 if (propiedad === "then") {
-                    // Convierte la consulta en "awaitable", como el builder real
                     return (resolver) => Promise.resolve().then(() => resolver(responder()));
+                }
+                if (metodos[propiedad]) {
+                    return (...args) => {
+                        registro.pasos.push([String(propiedad), args]);
+                        return metodos[propiedad](...args);
+                    };
                 }
                 return (...args) => {
                     registro.pasos.push([String(propiedad), args]);
-                    return consulta;
+                    return proxy;
                 };
             }
         }
     );
 
-    return consulta;
+    return proxy;
 }
-
 const clienteSupabaseFalso = {
     from: (tabla) => crearConsulta(tabla),
     auth: {

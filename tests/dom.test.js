@@ -366,6 +366,45 @@ test("la pestana de mensajes lista los mensajes y cuenta los no leidos", async (
     assert.equal(document.querySelector("#badge-mensajes").textContent, "1", "deberia contar 1 no leido");
 });
 
+// ================================================================= rendimiento
+// MEDICION (2025): con el codigo actual hace 5 consultas y baja 4.000 filas con
+// todas sus variantes para mostrar 24. Queda como pendiente hasta que el
+// filtrado y la paginacion se muevan al servidor.
+test(
+    "con 4.000 productos el catalogo se resuelve en una consulta de una pagina",
+    { todo: "pendiente: filtrar y paginar en el servidor" },
+    async () => {
+    const app = await cargarAplicacion();
+
+    // Catalogos reales de este proyecto: mas de 4.000 codigos
+    const catalogo = Array.from({ length: 4000 }, (_, i) =>
+        filaProducto({ id: `p${i}`, codigo: `COD-${i}`, nombre: `Producto ${i}` })
+    );
+    escenarioAdmin({ productos: catalogo });
+
+    await app.arrancarCatalogo();
+
+    const consultas = estado.consultas.filter((c) => c.tabla === "productos");
+    const filasBajadas = consultas.reduce((suma, c) => suma + (c.devuelve || 0), 0);
+
+    assert.equal(
+        consultas.length,
+        1,
+        `deberia resolver el catalogo con 1 consulta; hizo ${consultas.length} y bajo ${filasBajadas} filas`
+    );
+    assert.ok(
+        filasBajadas <= 24,
+        `deberia bajar solo la pagina visible (24 filas); bajo ${filasBajadas}`
+    );
+    assert.equal(tarjetas().length, 24, "deberia pintar la primera pagina");
+        assert.match(
+            textoDe("#resultados-busqueda"),
+            /4000|4\.000/,
+            "el contador deberia conocer el total del catalogo"
+        );
+    }
+);
+
 test("privatizar un producto lo desactiva en Supabase y lo saca del catalogo", async () => {
     const app = await cargarAplicacion();
     escenarioAdmin();
