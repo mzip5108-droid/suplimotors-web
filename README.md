@@ -4,6 +4,9 @@ Aplicación web para vender y administrar repuestos de motor. Frontend en
 **JavaScript vanilla con módulos ES** (sin bundler ni framework) y backend en
 **Supabase** (Postgres + Auth + Storage + Edge Functions).
 
+> **¿Qué queda por hacer?** Está todo listado, en orden y con los comandos
+exactos, en [TAREAS.md](TAREAS.md).
+
 El catálogo es **privado**: hace falta iniciar sesión para verlo. Toda la
 seguridad real vive en las políticas **RLS** de Postgres, no en el frontend.
 
