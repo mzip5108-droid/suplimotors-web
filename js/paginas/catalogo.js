@@ -1019,10 +1019,9 @@ export async function iniciarSesion() {
         input.value = '';
         passwordInput.value = '';
 
-        // Aplicar permisos del rol y repintar las tarjetas para que un
-        // administrador vea de inmediato sus acciones
+        // Permisos del rol y recarga de datos con la sesion ya activa
         aplicarPermisosPorRol(perfilActual);
-        renderizarProductosConPaginacion();
+        await recargarDatosDeLaSesion();
 
         // Redirigir según rol
         redirigirPorRol(perfilActual);
@@ -1564,6 +1563,29 @@ export async function cargarMarcasDesdeSupabase() {
 // ============================================
 // LEER PARAMETRO ?categoria=ID DE LA URL
 // ============================================
+// ============================================
+// RECARGA DE DATOS TRAS INICIAR SESION
+// Con RLS activo la carga previa al login se hizo como usuario anonimo y volvio
+// vacia, asi que al autenticarse hay que volver a pedir catalogo, marcas,
+// categorias y clientes. No se reinicializan los listeners para no duplicarlos.
+// ============================================
+export async function recargarDatosDeLaSesion() {
+    await cargarCategoriasDesdeSupabase();
+    await cargarMarcasDesdeSupabase();
+    await cargarProductosDesdeSupabase();
+
+    renderizarCategorias();
+    actualizarSelectCategorias();
+    actualizarSelectMarcas();
+    actualizarFiltroMarcas();
+    actualizarEstadisticasInventario();
+
+    await cargarClientes();
+    renderizarClientes();
+
+    renderizarProductosConPaginacion();
+}
+
 export function leerCategoriaDeURL() {
     const params = new URLSearchParams(window.location.search);
     const categoriaId = params.get('categoria');
