@@ -4,7 +4,7 @@
 
 import { PLACEHOLDER_IMG, getImagenMarca } from "../lib/imagenes-marcas.js";
 import { normalizarTexto } from "../lib/util.js";
-import { abrirModalCliente, guardarCliente, renderizarClientes } from "./clientes.js";
+import { cargarClientes, inicializarClientes, renderizarClientes } from "./clientes.js";
 import { inicializarImportador, llenarSelectCategoriaImportar, llenarSelectMarcaImportar } from "./importador-excel.js";
 import { cargarMensajes, inicializarMensajes } from "./mensajes.js";
 import { actualizarReportes } from "./reportes.js";
@@ -13,6 +13,7 @@ import { AuthService } from "../servicios/auth-service.js";
 import { BrandService } from "../servicios/brand-service.js";
 import { CategoryService } from "../servicios/category-service.js";
 import { ProductService } from "../servicios/product-service.js";
+import { VentaService } from "../servicios/venta-service.js";
 
 export let productos = JSON.parse(localStorage.getItem("supli_motors_productos")) || [];
 
@@ -626,7 +627,7 @@ export function actualizarResumenPedido() {
     return total.toFixed(2);
 }
 
-export function enviarPedidoWhatsApp() {
+export async function enviarPedidoWhatsApp() {
     const nombre = document.getElementById("nombre-cliente").value.trim();
     const cedula = document.getElementById("cedula-cliente").value.trim();
     const email = document.getElementById("email-cliente").value.trim();
@@ -662,17 +663,17 @@ export function enviarPedidoWhatsApp() {
     
     window.open(urlWhatsApp, '_blank');
     
-    const fecha = new Date().toLocaleString();
-    const facturaData = {
-        ...datosCliente,
-        carrito: carrito,
-        total: total,
-        fecha: fecha,
-    };
-    
-    const historial = JSON.parse(localStorage.getItem("supli_motors_historial")) || [];
-    historial.push(facturaData);
-    localStorage.setItem("supli_motors_historial", JSON.stringify(historial));
+    // La venta se registra en Supabase (tablas ventas / venta_items). Si la
+    // migracion todavia no esta aplicada, queda en el navegador para no perderla.
+    const venta = await VentaService.registrar(datosCliente, carrito, total);
+
+    if (!venta.ok) {
+        console.warn(
+            "La venta no se pudo guardar en Supabase; se guarda en el navegador:",
+            venta.error
+        );
+        VentaService.guardarEnHistorialLocal(datosCliente, carrito, total);
+    }
     
     carrito = [];
     guardarCarrito();
@@ -715,6 +716,9 @@ export function activarPestanaAdmin(tabId) {
     }
     if (tabId === 'usuarios') {
         cargarUsuarios();
+    }
+    if (tabId === 'clientes') {
+        cargarClientes().then(renderizarClientes);
     }
 }
 
@@ -1593,7 +1597,8 @@ export async function arrancarCatalogo() {
     inicializarAdmin();
     inicializarImportador();
     inicializarExcel();
-    renderizarClientes();
+    // Carga los clientes desde Supabase, los pinta y deja armado el buscador
+    await inicializarClientes();
     actualizarReportes();
     inicializarMejoras();
     inicializarUserDropdown();
@@ -1744,19 +1749,7 @@ if (searchPanelInput) {
     document.getElementById('btn-logout-header').addEventListener('click', cerrarSesion);
 
 
-    // 11. EVENTOS DE CLIENTES
-    document.getElementById('btn-nuevo-cliente').addEventListener('click', () => abrirModalCliente());
-    document.getElementById('btn-guardar-cliente').addEventListener('click', guardarCliente);
-    document.getElementById('cerrar-modal-cliente').addEventListener('click', () => {
-        document.getElementById('modal-cliente').style.display = 'none';
-    });
-    document.getElementById('btn-buscar-cliente').addEventListener('click', () => {
-        const filtro = document.getElementById('buscador-cliente').value;
-        renderizarClientes(filtro);
-    });
-    document.getElementById('buscador-cliente').addEventListener('input', (e) => {
-        renderizarClientes(e.target.value);
-    });
+    // 11. EVENTOS DE CLIENTES: los arma el modulo de clientes (ver inicializarClientes)
 
     // 12. EVENTOS DE REPORTES
     document.getElementById('btn-actualizar-reporte').addEventListener('click', actualizarReportes);
@@ -1765,12 +1758,10 @@ if (searchPanelInput) {
 window.onclick = (event) => {
     const modalDetalle = document.getElementById("modal-detalle");
     const modalCompra = document.getElementById("modal-compra");
-    const modalCliente = document.getElementById("modal-cliente");
     const modalLogin = document.getElementById("modal-login");
     
     if (event.target === modalDetalle) modalDetalle.style.display = "none";
     if (event.target === modalCompra) modalCompra.style.display = "none";
-    if (event.target === modalCliente) modalCliente.style.display = "none";
     
     // Bloquear cierre del modal de login si no hay sesión
     if (event.target === modalLogin && perfilActual) {

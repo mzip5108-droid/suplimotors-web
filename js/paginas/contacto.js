@@ -127,7 +127,7 @@ async function manejarEnvio(e, abrirWhatsApp) {
     const btnWhatsApp = document.getElementById('contacto-whatsapp');
 
     const btnActivo = abrirWhatsApp ? btnWhatsApp : btnSubmit;
-    const textoOriginal = btnActivo.textContent;
+    const textoOriginal = btnActivo ? btnActivo.textContent : '';
 
     btnSubmit.disabled = true;
     btnWhatsApp.disabled = true;
@@ -156,6 +156,8 @@ async function manejarEnvio(e, abrirWhatsApp) {
     } finally {
         btnSubmit.disabled = false;
         btnWhatsApp.disabled = false;
+        // Se restaura la etiqueta que tenia el boton que se apreto
+        if (btnActivo) btnActivo.textContent = textoOriginal;
         btnSubmit.textContent = 'Enviar mensaje';
         btnWhatsApp.textContent = 'Enviar por WhatsApp';
     }

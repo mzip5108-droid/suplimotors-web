@@ -5,12 +5,14 @@
   "description": "Catalogo y gestion de repuestos Supli Motors - JS vanilla (modulos ES) + Supabase",
   "type": "module",
   "scripts": {
+    "dev": "node tools/servidor-dev.cjs",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write \"js/**/*.js\"",
     "format:check": "prettier --check \"js/**/*.js\"",
     "verificar:imports": "node tools/verificar-imports.cjs",
-    "verify": "npm run lint && npm run verificar:imports"
+    "test": "node tests/logica.test.js",
+    "verify": "npm run lint && npm run verificar:imports && npm test"
   },
   "devDependencies": {
     "eslint": "^9.15.0",

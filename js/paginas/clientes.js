@@ -1,186 +1,277 @@
 // ============================================
-// Panel de administracion: clientes (pendiente de migrar a Supabase)
+// Panel de administracion: clientes
+// Los clientes viven en la tabla `clientes` de Supabase (los crea la Edge
+// Function admin-create-user junto con el usuario de auth). Antes esta pantalla
+// mantenia una lista paralela en el localStorage del navegador, asi que cada
+// equipo veia clientes distintos y se perdian al limpiar el navegador.
 // ============================================
 
-// ============================================
-// VARIABLES DE CLIENTES Y SISTEMA
-// ============================================
-export const clientes = JSON.parse(localStorage.getItem("supli_motors_clientes")) || [];
+import { sb } from "../servicios/supabase-client.js";
+import { abrirEdicionUsuario } from "./usuarios.js";
 
-export let clienteEditando = null;
-
-export const guardarClientes = () => localStorage.setItem("supli_motors_clientes", JSON.stringify(clientes));
+// Cache en memoria de la ultima consulta
+export let clientes = [];
 
 // ============================================
-// FUNCIONES DE CLIENTES
+// CARGA
 // ============================================
-export function renderizarClientes(filtro = '') {
-    const tbody = document.getElementById('cuerpo-clientes');
-    if (!tbody) return;
-    
-    let clientesFiltrados = clientes;
-    if (filtro) {
-        const filtroLower = filtro.toLowerCase();
-        clientesFiltrados = clientes.filter(c => 
-            c.cedula.includes(filtroLower) ||
-            c.nombre.toLowerCase().includes(filtroLower)
-        );
+export async function cargarClientes() {
+    const { data, error } = await sb
+        .from("clientes")
+        .select("id, cedula, nombre, telefono, email, direccion, activo, created_at")
+        .order("nombre");
+
+    if (error) {
+        console.error("Error al cargar clientes:", error);
+        return { ok: false, error: error.message, data: [] };
     }
-    
-    tbody.innerHTML = '';
-    
-    if (clientesFiltrados.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:30px; color:#94a3b8;">No hay clientes registrados</td></tr>`;
-        return;
-    }
-    
-    clientesFiltrados.forEach((cliente, index) => {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-            <td>${cliente.cedula}</td>
-            <td><strong>${cliente.nombre}</strong></td>
-            <td>${cliente.telefono || '-'}</td>
-            <td>${cliente.compras || 0}</td>
-            <td>$${(cliente.totalGastado || 0).toFixed(2)}</td>
-            <td>
-                <button class="btn-accion-cliente btn-ver-cliente" onclick="verHistorialCliente(${index})">Ver</button>
-                <button class="btn-accion-cliente btn-editar-cliente" onclick="editarCliente(${index})">Editar</button>
-                <button class="btn-accion-cliente btn-eliminar-admin" onclick="eliminarCliente(${index})">Eliminar</button>
-            </td>
-        `;
-        tbody.appendChild(tr);
-    });
+
+    clientes = (data || []).filter((c) => c.activo !== false);
+    await completarResumenDeCompras();
+
+    return { ok: true, data: clientes };
 }
 
-export function abrirModalCliente(cliente = null) {
-    const modal = document.getElementById('modal-cliente');
-    const titulo = document.getElementById('modal-cliente-titulo');
-    const cedula = document.getElementById('cliente-cedula');
-    const nombre = document.getElementById('cliente-nombre');
-    const telefono = document.getElementById('cliente-telefono');
-    const email = document.getElementById('cliente-email');
-    const direccion = document.getElementById('cliente-direccion');
-    
-    if (cliente) {
-        titulo.textContent = 'Editar Cliente';
-        cedula.value = cliente.cedula;
-        cedula.disabled = true;
-        nombre.value = cliente.nombre;
-        telefono.value = cliente.telefono || '';
-        email.value = cliente.email || '';
-        direccion.value = cliente.direccion || '';
-        clienteEditando = cliente;
-    } else {
-        titulo.textContent = 'Nuevo Cliente';
-        cedula.value = '';
-        cedula.disabled = false;
-        nombre.value = '';
-        telefono.value = '';
-        email.value = '';
-        direccion.value = '';
-        clienteEditando = null;
-    }
-    // Mostrar campos de cliente por defecto
-    const camposCliente = document.getElementById('campos-cliente');
-    if (camposCliente) {
-        camposCliente.style.display = 'block';
-    }
-modal.style.display = 'block';
-modal.style.opacity = '1';
-modal.style.visibility = 'visible';
-}
+// Agrega a cada cliente cuantas compras tiene y cuanto gasto.
+// Se calcula desde la tabla `ventas`. Si la migracion todavia no se aplico,
+// cae al historial guardado en el navegador para no dejar la columna vacia.
+async function completarResumenDeCompras() {
+    const { data, error } = await sb.from("ventas").select("cliente_id, total");
 
-export function guardarCliente() {
-    const cedula = document.getElementById('cliente-cedula').value.trim();
-    const nombre = document.getElementById('cliente-nombre').value.trim();
-    const telefono = document.getElementById('cliente-telefono').value.trim();
-    const email = document.getElementById('cliente-email').value.trim();
-    const direccion = document.getElementById('cliente-direccion').value.trim();
-    
-    if (!cedula || !nombre) {
-        alert('La cedula y el nombre son obligatorios');
-        return;
-    }
-    
-    if (!clienteEditando && clientes.some(c => c.cedula === cedula)) {
-        alert('Ya existe un cliente con esta cedula');
-        return;
-    }
-    
-    if (clienteEditando) {
-        const index = clientes.findIndex(c => c.cedula === clienteEditando.cedula);
-        if (index !== -1) {
-            clientes[index] = {
-                ...clientes[index],
-                nombre: nombre,
-                telefono: telefono,
-                email: email,
-                direccion: direccion
-            };
+    const porCliente = new Map();
+
+    if (!error && data) {
+        for (const venta of data) {
+            const actual = porCliente.get(venta.cliente_id) || { compras: 0, total: 0 };
+            actual.compras += 1;
+            actual.total += Number(venta.total || 0);
+            porCliente.set(venta.cliente_id, actual);
         }
-        alert('Cliente actualizado correctamente');
     } else {
-        clientes.push({
-            cedula: cedula,
-            nombre: nombre,
-            telefono: telefono,
-            email: email,
-            direccion: direccion,
-            compras: 0,
-            totalGastado: 0,
-            fechaRegistro: new Date().toISOString()
+        const historial = JSON.parse(localStorage.getItem("supli_motors_historial")) || [];
+        for (const cliente of clientes) {
+            const propias = historial.filter((h) => h.cedula === cliente.cedula);
+            porCliente.set(cliente.id, {
+                compras: propias.length,
+                total: propias.reduce((suma, h) => suma + Number(h.total || 0), 0)
+            });
+        }
+    }
+
+    for (const cliente of clientes) {
+        const resumen = porCliente.get(cliente.id) || { compras: 0, total: 0 };
+        cliente.compras = resumen.compras;
+        cliente.totalGastado = resumen.total;
+    }
+}
+
+// ============================================
+// RENDER
+// Se construye con DOM y textContent: los datos vienen de la base y no se
+// confian. Antes se usaba innerHTML con los datos interpolados y onclick inline.
+// ============================================
+export function renderizarClientes(filtro = "") {
+    const tbody = document.getElementById("cuerpo-clientes");
+    if (!tbody) return;
+
+    const termino = String(filtro || "").trim().toLowerCase();
+    const visibles = termino
+        ? clientes.filter(
+              (c) =>
+                  String(c.cedula || "").toLowerCase().includes(termino) ||
+                  String(c.nombre || "").toLowerCase().includes(termino)
+          )
+        : clientes;
+
+    tbody.innerHTML = "";
+
+    if (visibles.length === 0) {
+        const tr = document.createElement("tr");
+        const td = document.createElement("td");
+        td.colSpan = 6;
+        td.style.textAlign = "center";
+        td.style.padding = "30px";
+        td.style.color = "#94a3b8";
+        td.textContent = clientes.length === 0 ? "No hay clientes registrados" : "Sin resultados";
+        tr.appendChild(td);
+        tbody.appendChild(tr);
+        return;
+    }
+
+    for (const cliente of visibles) {
+        const tr = document.createElement("tr");
+
+        const celdas = [
+            cliente.cedula || "-",
+            cliente.nombre || "-",
+            cliente.telefono || "-",
+            String(cliente.compras || 0),
+            `$${Number(cliente.totalGastado || 0).toFixed(2)}`
+        ];
+
+        celdas.forEach((valor, indice) => {
+            const td = document.createElement("td");
+            if (indice === 1) {
+                const fuerte = document.createElement("strong");
+                fuerte.textContent = valor;
+                td.appendChild(fuerte);
+            } else {
+                td.textContent = valor;
+            }
+            tr.appendChild(td);
         });
-        alert('Cliente registrado correctamente');
-    }
-    
-    guardarClientes();
-    renderizarClientes();
-    document.getElementById('modal-cliente').style.display = 'none';
-}
 
-export function editarCliente(index) {
-    abrirModalCliente(clientes[index]);
-}
+        const acciones = document.createElement("td");
+        acciones.appendChild(
+            crearBotonAccion("Ver", "btn-ver-cliente", () => verHistorialCliente(cliente.id))
+        );
+        acciones.appendChild(
+            crearBotonAccion("Editar", "btn-editar-cliente", () => editarCliente(cliente.id))
+        );
+        acciones.appendChild(
+            crearBotonAccion("Eliminar", "btn-eliminar-admin", () => eliminarCliente(cliente.id))
+        );
+        tr.appendChild(acciones);
 
-export function eliminarCliente(index) {
-    if (confirm(`Eliminar al cliente "${clientes[index].nombre}"?`)) {
-        clientes.splice(index, 1);
-        guardarClientes();
-        renderizarClientes();
-        alert('Cliente eliminado');
+        tbody.appendChild(tr);
     }
 }
 
-export function verHistorialCliente(index) {
-    const cliente = clientes[index];
-    const historial = JSON.parse(localStorage.getItem("supli_motors_historial")) || [];
-    const compras = historial.filter(h => h.cedula === cliente.cedula);
-    
+function crearBotonAccion(texto, clase, alHacerClic) {
+    const boton = document.createElement("button");
+    boton.className = `btn-accion-cliente ${clase}`;
+    boton.textContent = texto;
+    boton.addEventListener("click", alHacerClic);
+    return boton;
+}
+
+// ============================================
+// HISTORIAL DE COMPRAS
+// ============================================
+export async function verHistorialCliente(id) {
+    const cliente = clientes.find((c) => c.id === id);
+    if (!cliente) return;
+
+    let compras = [];
+
+    // Con la migracion aplicada el detalle sale de `ventas` + `venta_items`
+    const { data, error } = await sb
+        .from("ventas")
+        .select("numero, created_at, total, venta_items (nombre, cantidad)")
+        .eq("cliente_id", id)
+        .order("created_at", { ascending: false });
+
+    if (!error && data) {
+        compras = data;
+    } else {
+        const historial = JSON.parse(localStorage.getItem("supli_motors_historial")) || [];
+        compras = historial
+            .filter((h) => h.cedula === cliente.cedula)
+            .map((h) => ({ created_at: h.fecha, total: h.total, venta_items: h.carrito || [] }));
+    }
+
     let mensaje = `HISTORIAL DE COMPRAS - ${cliente.nombre}\n`;
     mensaje += `Cedula: ${cliente.cedula}\n`;
     mensaje += `Total compras: ${cliente.compras || 0}\n`;
-    mensaje += `Total gastado: $${(cliente.totalGastado || 0).toFixed(2)}\n\n`;
-    
+    mensaje += `Total gastado: $${Number(cliente.totalGastado || 0).toFixed(2)}\n\n`;
+
     if (compras.length === 0) {
-        mensaje += 'No tiene compras registradas';
+        mensaje += "No tiene compras registradas";
     } else {
         compras.forEach((compra, i) => {
             mensaje += `--- Compra ${i + 1} ---\n`;
-            mensaje += `Fecha: ${compra.fecha || 'N/A'}\n`;
+            mensaje += `Fecha: ${compra.created_at || "N/A"}\n`;
             mensaje += `Total: $${compra.total || 0}\n`;
-            mensaje += `Productos: ${compra.carrito ? compra.carrito.length : 0}\n\n`;
+            mensaje += `Productos: ${compra.venta_items ? compra.venta_items.length : 0}\n\n`;
         });
     }
-    
+
     alert(mensaje);
 }
 
 // ============================================
-// Puente para los handlers declarados en las plantillas HTML de la tabla
-// (onclick="..."), que se evaluan en el ambito global y no ven los modulos.
-// Al migrar esta tabla a addEventListener se puede eliminar.
+// EDITAR
+// Reutiliza el modal de edicion del panel de usuarios, que ya sabe actualizar
+// el email real en `perfiles` y el telefono/direccion en `clientes`.
 // ============================================
-window.verHistorialCliente = verHistorialCliente;
-window.editarCliente = editarCliente;
-window.eliminarCliente = eliminarCliente;
+export function editarCliente(id) {
+    const cliente = clientes.find((c) => c.id === id);
+    if (!cliente) return;
 
+    abrirEdicionUsuario(
+        {
+            id: cliente.id,
+            nombre: cliente.nombre,
+            rol: "cliente",
+            email: cliente.email || null
+        },
+        cliente
+    );
+}
+
+// ============================================
+// BAJA
+// Es una baja logica: se conserva el historial de compras del cliente.
+// ============================================
+export async function eliminarCliente(id) {
+    const cliente = clientes.find((c) => c.id === id);
+    if (!cliente) return;
+
+    if (
+        !confirm(
+            `Desactivar al cliente "${cliente.nombre}"?\n\n` +
+                "Se conserva su historial de compras, pero deja de aparecer en la lista y no podra iniciar sesion."
+        )
+    ) {
+        return;
+    }
+
+    const { error } = await sb.from("clientes").update({ activo: false }).eq("id", id);
+    if (error) {
+        alert("Error al desactivar: " + error.message);
+        return;
+    }
+
+    const { error: errorPerfil } = await sb
+        .from("perfiles")
+        .update({ activo: false })
+        .eq("id", id);
+    if (errorPerfil) {
+        console.warn("El cliente se desactivo pero su perfil no:", errorPerfil);
+    }
+
+    clientes = clientes.filter((c) => c.id !== id);
+    renderizarClientes();
+    alert("Cliente desactivado");
+}
+
+// ============================================
+// INICIALIZACION
+// ============================================
+export async function inicializarClientes() {
+    const buscador = document.getElementById("buscador-cliente");
+    const btnBuscar = document.getElementById("btn-buscar-cliente");
+    const btnNuevo = document.getElementById("btn-nuevo-cliente");
+
+    if (buscador) {
+        buscador.addEventListener("input", (e) => renderizarClientes(e.target.value));
+    }
+    if (btnBuscar) {
+        btnBuscar.addEventListener("click", () => {
+            renderizarClientes(buscador ? buscador.value : "");
+        });
+    }
+
+    // El alta de un cliente crea tambien su usuario de acceso, y eso solo puede
+    // hacerlo la Edge Function admin-create-user desde la pestana de usuarios.
+    // Antes este boton guardaba el cliente solo en el navegador, sin usuario.
+    if (btnNuevo) {
+        btnNuevo.addEventListener("click", () => {
+            const pestanaUsuarios = document.querySelector('.admin-tab[data-tab="usuarios"]');
+            if (pestanaUsuarios) pestanaUsuarios.click();
+        });
+    }
+
+    await cargarClientes();
+    renderizarClientes();
+}

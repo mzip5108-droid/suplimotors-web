@@ -72,6 +72,16 @@ export default [
         rules: REGLAS
     },
     {
+        // Tests: corren en Node, con stubs de navegador
+        files: ["tests/**/*.js"],
+        languageOptions: {
+            ecmaVersion: 2023,
+            sourceType: "module",
+            globals: { ...globals.node }
+        },
+        rules: REGLAS
+    },
+    {
         // Herramientas de verificacion en Node (CommonJS)
         files: ["tools/**/*.cjs"],
         languageOptions: {

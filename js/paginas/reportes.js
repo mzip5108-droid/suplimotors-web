@@ -2,14 +2,22 @@
 // Panel de administracion: reportes de ventas
 // ============================================
 
+import { VentaService } from "../servicios/venta-service.js";
 import { clientes } from "./clientes.js";
 
 // ============================================
 // FUNCIONES DE REPORTES
 // ============================================
-export function actualizarReportes() {
+export async function actualizarReportes() {
     const periodo = document.getElementById('reporte-periodo').value;
-    const historial = JSON.parse(localStorage.getItem("supli_motors_historial")) || [];
+
+    // Las ventas se leen de Supabase; si la migracion no esta aplicada se usa el
+    // historial del navegador (VentaService.historial ya resuelve el respaldo).
+    const resultadoHistorial = await VentaService.historial();
+    const historial = resultadoHistorial.data;
+    if (resultadoHistorial.origen === "local") {
+        console.warn("Reportes calculados con el historial del navegador: falta aplicar la migracion de ventas.");
+    }
     const hoy = new Date();
     let fechaInicio = new Date(0);
     
@@ -56,8 +64,8 @@ export function actualizarReportes() {
     document.getElementById('reporte-productos-vendidos').textContent = productosVendidos;
     
     const clientesNuevos = clientes.filter(c => {
-        if (!c.fechaRegistro) return false;
-        return new Date(c.fechaRegistro) >= fechaInicio;
+        if (!c.created_at) return false;
+        return new Date(c.created_at) >= fechaInicio;
     });
     document.getElementById('reporte-clientes-nuevos').textContent = clientesNuevos.length;
     
@@ -117,17 +125,30 @@ export function renderizarTopProductos(ventasPorProducto) {
             padding: 10px 0;
             border-bottom: 1px solid #e2e8f0;
         `;
-        div.innerHTML = `
-            <div>
-                <span style="font-weight:600; color:#0f172a;">${index + 1}. ${nombre}</span>
-            </div>
-            <div>
-                <span style="color:#64748b;">Cantidad: </span>
-                <span style="font-weight:600; color:#1a56db;">${data.cantidad}</span>
-                <span style="color:#64748b; margin-left:15px;">Total: </span>
-                <span style="font-weight:600; color:#1a56db;">$${data.total.toFixed(2)}</span>
-            </div>
-        `;
+        // Construido con DOM y textContent: el nombre del producto viene de la
+        // base (y antes de un Excel) y no se interpola en HTML.
+        const izquierda = document.createElement('div');
+        const titulo = document.createElement('span');
+        titulo.style.cssText = 'font-weight:600; color:#0f172a;';
+        titulo.textContent = `${index + 1}. ${nombre}`;
+        izquierda.appendChild(titulo);
+
+        const derecha = document.createElement('div');
+        const etiquetaCantidad = document.createElement('span');
+        etiquetaCantidad.style.color = '#64748b';
+        etiquetaCantidad.textContent = 'Cantidad: ';
+        const valorCantidad = document.createElement('span');
+        valorCantidad.style.cssText = 'font-weight:600; color:#1a56db;';
+        valorCantidad.textContent = String(data.cantidad);
+        const etiquetaTotal = document.createElement('span');
+        etiquetaTotal.style.cssText = 'color:#64748b; margin-left:15px;';
+        etiquetaTotal.textContent = 'Total: ';
+        const valorTotal = document.createElement('span');
+        valorTotal.style.cssText = 'font-weight:600; color:#1a56db;';
+        valorTotal.textContent = `$${data.total.toFixed(2)}`;
+        derecha.append(etiquetaCantidad, valorCantidad, etiquetaTotal, valorTotal);
+
+        div.append(izquierda, derecha);
         container.appendChild(div);
     });
 }

@@ -602,23 +602,8 @@
         </div>
     </div>
 
-    <!-- MODAL NUEVO CLIENTE -->
-    <div id="modal-cliente" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3 id="modal-cliente-titulo">Nuevo Cliente</h3>
-                <button class="btn-cerrar-modal" id="cerrar-modal-cliente">X</button>
-            </div>
-            <div class="cliente-form">
-                <input type="text" id="cliente-cedula" placeholder="Cedula *">
-                <input type="text" id="cliente-nombre" placeholder="Nombre completo *">
-                <input type="tel" id="cliente-telefono" placeholder="Telefono">
-                <input type="email" id="cliente-email" placeholder="Email">
-                <input type="text" id="cliente-direccion" placeholder="Direccion">
-                <button id="btn-guardar-cliente" class="btn-primary">Guardar Cliente</button>
-            </div>
-        </div>
-    </div>
+    <!-- El alta de clientes se hace desde la pestana Usuarios: crea el cliente
+         y su usuario de acceso en un solo paso (Edge Function admin-create-user). -->
     <!-- MODAL NUEVO USUARIO -->
     <div id="modal-nuevo-usuario" class="modal">
         <div class="modal-content modal-facturacion">
