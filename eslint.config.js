@@ -2,23 +2,13 @@ import js from "@eslint/js";
 import globals from "globals";
 
 /**
- * El proyecto carga los scripts con <script src> clasicos (sin bundler), asi que
- * parte de los nombres viven en window. Estas listas se iran vaciando a medida
- * que los modulos ES reemplacen a los globales.
+ * El SDK de Supabase, XLSX y pdf.js se cargan por CDN con <script src> en las
+ * vistas, asi que siguen siendo globales del navegador y no se importan.
  */
 const SDK_CDN = {
     supabase: "readonly",
     XLSX: "readonly",
     pdfjsLib: "readonly"
-};
-
-// Servicios que app.js y las paginas consumen pero no definen
-const SERVICIOS = {
-    AuthService: "readonly",
-    BrandService: "readonly",
-    CategoryService: "readonly",
-    ProductService: "readonly",
-    ExcelImportService: "readonly"
 };
 
 const REGLAS = {
@@ -63,7 +53,7 @@ export default [
     },
     js.configs.recommended,
     {
-        // Config del propio linter: es un modulo ES
+        // Config del propio linter
         files: ["eslint.config.js"],
         languageOptions: {
             ecmaVersion: 2023,
@@ -72,39 +62,22 @@ export default [
         }
     },
     {
-        // Paginas que consumen los servicios
-        files: ["app.js", "categorias.js", "contacto.js"],
+        // Aplicacion modular: cada archivo declara sus imports y exports
+        files: ["js/**/*.js"],
         languageOptions: {
             ecmaVersion: 2023,
-            sourceType: "script",
-            globals: { ...globals.browser, ...SDK_CDN, ...SERVICIOS }
-        },
-        rules: REGLAS
-    },
-    {
-        // Servicios: definen sus propios objetos, solo necesitan el SDK
-        files: [
-            "auth-service.js",
-            "brand-service.js",
-            "category-service.js",
-            "product-service.js",
-            "supabase-client.js",
-            "test-pdf.js"
-        ],
-        languageOptions: {
-            ecmaVersion: 2023,
-            sourceType: "script",
+            sourceType: "module",
             globals: { ...globals.browser, ...SDK_CDN }
         },
         rules: REGLAS
     },
     {
-        // El importador de Excel consume ProductService directamente
-        files: ["excel-import-service.js"],
+        // Herramientas de verificacion en Node (CommonJS)
+        files: ["tools/**/*.cjs"],
         languageOptions: {
             ecmaVersion: 2023,
-            sourceType: "script",
-            globals: { ...globals.browser, ...SDK_CDN, ProductService: "readonly" }
+            sourceType: "commonjs",
+            globals: { ...globals.node }
         },
         rules: REGLAS
     }

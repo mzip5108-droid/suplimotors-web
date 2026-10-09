@@ -1,4 +1,11 @@
 // ============================================
+// Pagina de categorias: grid con contador de productos por categoria
+// ============================================
+
+import { AuthService } from "../servicios/auth-service.js";
+import { sb } from "../servicios/supabase-client.js";
+
+// ============================================
 // CATEGORIAS PAGE - Logica de la pagina de categorias
 // ============================================
 
@@ -12,7 +19,7 @@ let contadoresProductos = {};
 async function cargarCategoriasConContadores() {
     try {
         // 1. Cargar categorias
-        const resultCats = await window.sb
+        const resultCats = await sb
             .from('categorias')
             .select('id, nombre, icono')
             .eq('activa', true)
@@ -27,7 +34,7 @@ async function cargarCategoriasConContadores() {
         todasLasCategorias = resultCats.data || [];
 
         // 2. Cargar productos activos para contar por categoria
-        const resultProds = await window.sb
+        const resultProds = await sb
             .from('productos')
             .select('categoria_id')
             .eq('activo', true);

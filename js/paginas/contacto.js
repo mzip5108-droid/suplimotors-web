@@ -1,4 +1,11 @@
 // ============================================
+// Pagina de contacto: formulario publico y envio por WhatsApp
+// ============================================
+
+import { AuthService } from "../servicios/auth-service.js";
+import { sb } from "../servicios/supabase-client.js";
+
+// ============================================
 // CONTACTO PAGE
 // ============================================
 
@@ -9,7 +16,7 @@ const NUMERO_WHATSAPP = '584141234567';
 // ============================================
 async function enviarMensajeSupabase(datos) {
     try {
-        const { error } = await window.sb
+        const { error } = await sb
             .from('mensajes_contacto')
             .insert({
                 nombre: datos.nombre,

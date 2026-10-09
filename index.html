@@ -7,10 +7,9 @@
     <link rel="stylesheet" href="style.css">
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
-    <script>
-        pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js";
-    </script>
+    <!-- pdf.js se retiro del arranque: el prototipo de importacion por PDF vive en
+         js/lib/pdf-prototipo.js y no lo carga ninguna vista. Para retomarlo hay que
+         volver a incluir pdfjs-dist y configurar workerSrc antes de este punto. -->
 
 </head>
 <body>
@@ -323,8 +322,7 @@
                 <div class="excel-buttons">
                     <button id="btn-exportar-excel" class="btn-excel-export">Exportar a Excel</button>
                     <button id="btn-importar-excel" class="btn-excel-import">Importar desde Excel</button>
-                    <input type="file" id="input-importar-excel" accept=".xlsx,.xls" style="display: none;">
-                </div>
+                                </div>
                 
                 <button id="btn-exportar-datos" class="btn-secondary">Exportar Datos (JSON)</button>
             </div>
@@ -742,12 +740,9 @@
     <div id="recibo-final" class="recibo">
         <div id="contenido-recibo"></div>
     </div>
-    <script src="supabase-client.js"></script>
-    <script src="auth-service.js"></script>
-    <script src="category-service.js"></script>
-    <script src="brand-service.js"></script>
-    <script src="product-service.js"></script>
-    <script src="excel-import-service.js"></script>
-    <script src="app.js"></script>
+    <!-- Punto de entrada unico: un modulo ES que importa el resto.
+         Los modulos son "deferred", asi que el listener de DOMContentLoaded
+         del arranque queda registrado antes de que el DOM este listo. -->
+    <script type="module" src="js/main.js"></script>
 </body>
 </html>

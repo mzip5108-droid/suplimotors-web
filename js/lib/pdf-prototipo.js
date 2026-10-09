@@ -1,8 +1,15 @@
 // ============================================
+// PROTOTIPO NO INTEGRADO: extraccion de texto de un PDF.
+// No lo carga ninguna vista. Se conserva porque exploraba una futura
+// importacion de listas de precios en PDF. Si se retoma, exponer esta
+// funcion desde la pestana de importar.
+// ============================================
+
+// ============================================
 // TEST: Extraer texto de un PDF
 // ============================================
 
-async function probarExtraerTextoPDF(archivo) {
+export async function probarExtraerTextoPDF(archivo) {
     console.log("📄 Procesando:", archivo.name);
     
     try {
@@ -43,6 +50,3 @@ async function probarExtraerTextoPDF(archivo) {
 }
 
 // Hacer la función accesible globalmente
-window.probarExtraerTextoPDF = probarExtraerTextoPDF;
-
-console.log("✅ test-pdf.js cargado");
