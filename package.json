@@ -1,0 +1,19 @@
+{
+  "name": "supli-motors-web",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Catalogo y gestion de repuestos Supli Motors - JS vanilla + Supabase",
+  "type": "module",
+  "scripts": {
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write \"**/*.js\"",
+    "format:check": "prettier --check \"**/*.js\"",
+    "verify": "npm run lint"
+  },
+  "devDependencies": {
+    "eslint": "^9.15.0",
+    "globals": "^15.12.0",
+    "prettier": "^3.3.3"
+  }
+}

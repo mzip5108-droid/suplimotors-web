@@ -1,0 +1,11 @@
+# CSS propio del proyecto: muy extenso y ajustado a mano, no se reformatea
+*.css
+
+# Vistas: se mantienen sin reformatear para no generar ruido en el historial
+*.html
+
+# Generado / terceros
+node_modules/
+img/
+supabase/.temp/
+package-lock.json

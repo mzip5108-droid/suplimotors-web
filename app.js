@@ -37,7 +37,6 @@ const IMAGENES_MARCAS = {
     'fraco': 'img/marcas/fraco.jpg',
     'federal mogul': 'img/marcas/federal-mogul.jpg',
     'melling': 'img/marcas/melling.jpg',
-    'original': 'img/marcas/original.png',
     'natsuki': 'img/marcas/natsuki.png',
     'masaki': 'img/marcas/masaki.jpg',
     'grant': 'img/marcas/grant.jpg',
@@ -49,24 +48,30 @@ const IMAGENES_MARCAS = {
     'pc pistons': 'img/marcas/pc-pistons.jpg',
     'top line': 'img/marcas/top-line.jpg',
     'usmn': 'img/marcas/usmn.jpg',
-    'asiainc': 'img/marcas/asiainc.jpg',
+    'asiainc': 'img/marcas/asiainc.jpeg',
     'sap': 'img/marcas/sap.png',
     'sm performance': 'img/marcas/sm-performance.jpg',
     'iridium': 'img/marcas/iridium.jpg',
+    // La marca puede venir como "Exact" o "Exactcar": ambas apuntan al mismo logo
+    'exact': 'img/marcas/exact.jpg',
     'exactcar': 'img/marcas/exact.jpg',
     'durabond': 'img/marcas/durabond.png',
     'fraven': 'img/marcas/fraven.jpg',
     'original': 'img/marcas/original.jpg',
     'oring': 'img/marcas/oring.jpg',
-    'gomas de válvulas': 'img/marcas/gomas-de-valvulas.jpg',
-
+    'gomas de válvulas': 'img/marcas/gomas-de-valvulas.jpg'
 };
+
+// Indice normalizado (sin tildes ni mayusculas) para que la busqueda del logo
+// no falle por acentos, mayusculas o espacios sobrantes.
+const INDICE_IMAGENES_MARCAS = Object.fromEntries(
+    Object.entries(IMAGENES_MARCAS).map(([clave, url]) => [normalizarTexto(clave), url])
+);
 
 // Helper: devuelve la URL de imagen según la marca
 function getImagenMarca(marca) {
     if (!marca) return null;
-    const key = String(marca).toLowerCase().trim();
-    return IMAGENES_MARCAS[key] || null;
+    return INDICE_IMAGENES_MARCAS[normalizarTexto(marca)] || null;
 }
 const guardarInventario = () => localStorage.setItem("supli_motors_productos", JSON.stringify(productos));
 const guardarCategorias = () => localStorage.setItem("supli_motors_categorias", JSON.stringify(categorias));
@@ -142,60 +147,15 @@ function actualizarContadorResultados(mostrados) {
     }
 }
 
+// ============================================
+// RENDER DE PRODUCTOS
+// ============================================
+// Punto de entrada: cualquier cambio de filtro se procesa desde aqui,
+// vuelve a la pagina 1 y repinta. El render real esta en
+// renderizarProductosConPaginacion() y las tarjetas en renderizarProductosPagina().
 function renderizarProductos() {
-    const productosFiltrados = filtrarProductos();
-    const contenedor = document.getElementById("contenedor-productos");
-    const esAdmin = perfilActual && (perfilActual.rol === 'admin' || perfilActual.rol === 'superusuario');
-    const esSuper = perfilActual && perfilActual.rol === 'superusuario';
-    
-    if (!contenedor) return;
-    contenedor.innerHTML = "";
-    
-    actualizarContadorResultados(productosFiltrados.length);
-    
-    if (productosFiltrados.length === 0) {
-        contenedor.innerHTML = `
-            <div class="no-resultados">
-                <p>No se encontraron productos</p>
-                <small>Intenta con otros terminos de busqueda o categorias</small>
-            </div>
-        `;
-        return;
-    }
-    
-    productosFiltrados.forEach((p, index) => {
-        const div = document.createElement("div");
-        div.className = "tarjeta-producto";
-        div.onclick = () => abrirDetalle(p);
-        
-        const categoriaNombre = p.categoria_nombre || 'Sin categoría';
-        const categoriaIcono = p.categoria_icono || '';
-        
-        div.innerHTML = `
-            <img src="${p.imagen || getImagenMarca(p.marca) || PLACEHOLDER_IMG}" class="img-previa" alt="${p.nombre}">
-            <div class="info-tarjeta">
-                <div class="categoria-badge">${categoriaIcono} ${categoriaNombre}</div>
-                <small class="codigo-producto">${p.codigo}</small>
-                <h3>${p.nombre}</h3>
-                ${p.marca ? `<small class="marca-producto">Marca: ${p.marca}</small>` : ''}
-                <p class="precio-producto"><strong>$${parseFloat(p.precio).toFixed(2)}</strong></p>
-                ${esAdmin && p.stock !== undefined ? `<small class="stock-info">Stock: ${p.stock}</small>` : ''}
-                ${esAdmin ? `
-                <div class="acciones-admin-tarjeta ${!esSuper ? 'solo-privatizar' : ''}" onclick="event.stopPropagation();">
-                        <button class="btn-accion-admin btn-privatizar" onclick="event.stopPropagation(); privatizarProducto('${p.id}')">
-                            Privatizar
-                        </button>
-                        ${esSuper ? `
-                            <button class="btn-accion-admin btn-eliminar-admin" onclick="event.stopPropagation(); eliminarProducto('${p.id}')">
-                                Eliminar
-                            </button>
-                        ` : ''}
-                    </div>
-                ` : ''}
-            </div>
-        `;
-        contenedor.appendChild(div);
-    });
+    paginaActual = 1;
+    renderizarProductosConPaginacion();
 }
 
 
@@ -559,15 +519,16 @@ function abrirDetalle(producto) {
     const categoriaNombre = producto.categoria_nombre || 'Sin categoría';
     const categoriaIcono = producto.categoria_icono || '';    
     document.getElementById("input-cantidad").value = cantidadSeleccionada;
-    document.getElementById("detalle-img").src = 
-        producto.imagen || getImagenMarca(producto.marca) || PLACEHOLDER_IMG;    document.getElementById("detalle-nombre").innerText = producto.nombre;
-    document.getElementById("detalle-codigo").innerHTML = `Cod: ${producto.codigo}`;
-    document.getElementById("detalle-categoria").innerHTML = `${categoriaIcono} ${categoriaNombre}`;
+    document.getElementById("detalle-img").src =
+        producto.imagen || getImagenMarca(producto.marca) || PLACEHOLDER_IMG;
+    document.getElementById("detalle-nombre").innerText = producto.nombre;
+    document.getElementById("detalle-codigo").textContent = `Cod: ${producto.codigo || ""}`;
+    document.getElementById("detalle-categoria").textContent = `${categoriaIcono} ${categoriaNombre}`.trim();
     document.getElementById("detalle-desc").innerText = producto.descripcion || "Sin descripcion disponible";
     document.getElementById("detalle-precio").innerText = parseFloat(producto.precio).toFixed(2);
     
     if (document.getElementById("detalle-marca")) {
-        document.getElementById("detalle-marca").innerHTML = producto.marca ? `Marca: ${producto.marca}` : '';
+        document.getElementById("detalle-marca").textContent = producto.marca ? `Marca: ${producto.marca}` : '';
     }
     
     if (document.getElementById("detalle-stock")) {
@@ -1222,27 +1183,22 @@ async function iniciarSesion() {
         
         // Login exitoso
         perfilActual = resultado.perfil;
-        
-        // Mostrar mensaje de bienvenida
-        alert(`¡Bienvenido ${perfilActual.nombre}!`);
-        window.location.href = 'inicio.html';
-        return;
+
+        // Desbloquear el scroll y ocultar el modal de login
         document.body.style.overflow = '';
-
-
-        
-        // Ocultar modal, mostrar logout
         document.getElementById('modal-login').style.display = 'none';
         document.getElementById('btn-logout').style.display = 'block';
         document.getElementById('btn-login').style.display = 'none';
-        
+
         // Limpiar campos
         input.value = '';
         passwordInput.value = '';
-        
-        // Aplicar permisos
+
+        // Aplicar permisos del rol y repintar las tarjetas para que un
+        // administrador vea de inmediato sus acciones
         aplicarPermisosPorRol(perfilActual);
-        
+        renderizarProductosConPaginacion();
+
         // Redirigir según rol
         redirigirPorRol(perfilActual);
         
@@ -1322,9 +1278,17 @@ function aplicarPermisosPorRol(perfil) {
 
 // ============================================
 // REDIRIGIR SEGÚN ROL
+// Los administradores se quedan en el panel (index.html) y el resto de
+// usuarios va a la portada. Antes esta funcion estaba vacia y el login
+// redirigia a todo el mundo a inicio.html por un return anticipado.
 // ============================================
 function redirigirPorRol(perfil) {
+    if (!perfil) return;
 
+    const esAdmin = perfil.rol === 'admin' || perfil.rol === 'superusuario';
+    if (esAdmin) return; // ya esta en index.html: no hace falta recargar
+
+    window.location.href = 'inicio.html';
 }
 
 // ============================================
@@ -1629,8 +1593,6 @@ let vistaActual = localStorage.getItem('supli_motors_vista') || 'grilla';
 let paginaActual = 1;
 let productosPorPagina = 24;
 let productosFiltradosCache = [];
-let categoriaSeleccionada = 'todos';
-let filtroBusqueda = '';
 
 // ============================================
 // 1. MODO OSCURO/CLARO
@@ -1763,7 +1725,9 @@ function renderizarPaginacion(totalProductos) {
 function renderizarProductosConPaginacion() {
     const productosFiltrados = filtrarProductos();
     productosFiltradosCache = productosFiltrados;
-    
+
+    actualizarContadorResultados(productosFiltrados.length);
+
     const inicio = (paginaActual - 1) * productosPorPagina;
     const fin = inicio + productosPorPagina;
     const productosPagina = productosFiltrados.slice(inicio, fin);
@@ -1773,13 +1737,21 @@ function renderizarProductosConPaginacion() {
     actualizarBreadcrumbs();
 }
 
+// ============================================
+// TARJETAS DE PRODUCTO
+// Se construyen con DOM y textContent, nunca con innerHTML interpolado:
+// los datos vienen de Excel/Supabase y no se confian.
+// ============================================
 function renderizarProductosPagina(productosPagina) {
     const contenedor = document.getElementById("contenedor-productos");
-    const esAdmin = perfilActual && (perfilActual.rol === 'admin' || perfilActual.rol === 'superusuario');  
-    const esSuper = perfilActual && perfilActual.rol === 'superusuario';   
     if (!contenedor) return;
+
+    const esAdmin =
+        perfilActual && (perfilActual.rol === "admin" || perfilActual.rol === "superusuario");
+    const esSuper = perfilActual && perfilActual.rol === "superusuario";
+
     contenedor.innerHTML = "";
-    
+
     if (productosPagina.length === 0) {
         contenedor.innerHTML = `
             <div class="no-resultados">
@@ -1789,48 +1761,103 @@ function renderizarProductosPagina(productosPagina) {
         `;
         return;
     }
-    
-    productosPagina.forEach((p, index) => {
-        const div = document.createElement("div");
-        div.className = "tarjeta-producto";
-        div.onclick = () => abrirDetalle(p);
-        
-        const categoriaNombre = p.categoria_nombre || 'Sin categoría';
-        const categoriaIcono = p.categoria_icono || '';
-        
-        div.innerHTML = `
-                <img src="${p.imagen || getImagenMarca(p.marca) || PLACEHOLDER_IMG}" class="img-previa" alt="${p.nombre}">
-            <div class="info-tarjeta">
-                <div class="categoria-badge">${categoriaIcono} ${categoriaNombre}</div>
-                <small class="codigo-producto">${p.codigo}</small>
-                <h3>${p.nombre}</h3>
-                ${p.marca ? `<small class="marca-producto">Marca: ${p.marca}</small>` : ''}
-                <p class="precio-producto"><strong>$${parseFloat(p.precio).toFixed(2)}</strong></p>
-                ${esAdmin && p.stock !== undefined ? `<small class="stock-info">Stock: ${p.stock}</small>` : ''}
-${esAdmin ? `
-    <div class="acciones-admin-tarjeta ${!esSuper ? 'solo-privatizar' : ''}" onclick="event.stopPropagation();">
-        <button class="btn-accion-admin btn-privatizar" onclick="event.stopPropagation(); privatizarProducto('${p.id}')">
-            Privatizar
-        </button>
-        ${perfilActual.rol === 'superusuario' ? `
-            <button class="btn-accion-admin btn-eliminar-admin" onclick="event.stopPropagation(); eliminarProducto('${p.id}')">
-                Eliminar
-            </button>
-        ` : ''}
-    </div>
-` : ''}            </div>
-        `;
-        contenedor.appendChild(div);
-        
+
+    productosPagina.forEach((p) => {
+        contenedor.appendChild(crearTarjetaProducto(p, esAdmin, esSuper));
     });
+
+    setTimeout(agregarAnimacionesTarjetas, 50);
 }
 
-// Sobrescribir renderizarProductos para usar paginacion
-const renderizarProductosOriginal = renderizarProductos;
-renderizarProductos = function() {
-    paginaActual = 1;
-    renderizarProductosConPaginacion();
-};
+function crearTarjetaProducto(p, esAdmin, esSuper) {
+    const div = document.createElement("div");
+    div.className = "tarjeta-producto";
+    div.onclick = () => abrirDetalle(p);
+
+    const imagen = document.createElement("img");
+    imagen.className = "img-previa";
+    imagen.alt = p.nombre || "Producto";
+    imagen.src = p.imagen || getImagenMarca(p.marca) || PLACEHOLDER_IMG;
+    // Si la imagen guardada ya no existe, mostramos el placeholder en vez de un icono roto
+    imagen.onerror = () => {
+        imagen.onerror = null;
+        imagen.src = PLACEHOLDER_IMG;
+    };
+    div.appendChild(imagen);
+
+    const info = document.createElement("div");
+    info.className = "info-tarjeta";
+
+    const badge = document.createElement("div");
+    badge.className = "categoria-badge";
+    badge.textContent = `${p.categoria_icono || ""} ${p.categoria_nombre || "Sin categoría"}`.trim();
+    info.appendChild(badge);
+
+    const codigo = document.createElement("small");
+    codigo.className = "codigo-producto";
+    codigo.textContent = p.codigo || "";
+    info.appendChild(codigo);
+
+    const titulo = document.createElement("h3");
+    titulo.textContent = p.nombre || "";
+    info.appendChild(titulo);
+
+    if (p.marca) {
+        const marca = document.createElement("small");
+        marca.className = "marca-producto";
+        marca.textContent = `Marca: ${p.marca}`;
+        info.appendChild(marca);
+    }
+
+    const precio = document.createElement("p");
+    precio.className = "precio-producto";
+    const precioValor = document.createElement("strong");
+    precioValor.textContent = `$${Number(p.precio || 0).toFixed(2)}`;
+    precio.appendChild(precioValor);
+    info.appendChild(precio);
+
+    if (esAdmin && p.stock !== undefined) {
+        const stock = document.createElement("small");
+        stock.className = "stock-info";
+        stock.textContent = `Stock: ${p.stock}`;
+        info.appendChild(stock);
+    }
+
+    if (esAdmin) {
+        info.appendChild(crearAccionesAdminProducto(p, esSuper));
+    }
+
+    div.appendChild(info);
+    return div;
+}
+
+function crearAccionesAdminProducto(p, esSuper) {
+    const contenedor = document.createElement("div");
+    contenedor.className = `acciones-admin-tarjeta${esSuper ? "" : " solo-privatizar"}`;
+    contenedor.onclick = (evento) => evento.stopPropagation();
+
+    const privatizar = document.createElement("button");
+    privatizar.className = "btn-accion-admin btn-privatizar";
+    privatizar.textContent = "Privatizar";
+    privatizar.onclick = (evento) => {
+        evento.stopPropagation();
+        privatizarProducto(p.id);
+    };
+    contenedor.appendChild(privatizar);
+
+    if (esSuper) {
+        const eliminar = document.createElement("button");
+        eliminar.className = "btn-accion-admin btn-eliminar-admin";
+        eliminar.textContent = "Eliminar";
+        eliminar.onclick = (evento) => {
+            evento.stopPropagation();
+            eliminarProducto(p.id);
+        };
+        contenedor.appendChild(eliminar);
+    }
+
+    return contenedor;
+}
 
 // ============================================
 // 4. BREADCRUMBS (MIGAS DE PAN)
@@ -1879,12 +1906,6 @@ function agregarAnimacionesTarjetas() {
         tarjetas.forEach(t => t.style.willChange = 'auto');
     }, 1500);
 }
-// Modificar renderizarProductosPagina para incluir animaciones
-const renderizarProductosPaginaOriginal = renderizarProductosPagina;
-renderizarProductosPagina = function(productosPagina) {
-    renderizarProductosPaginaOriginal(productosPagina);
-    setTimeout(agregarAnimacionesTarjetas, 50);
-};
 
 // ============================================
 // 6. INICIALIZAR MEJORAS
@@ -2240,7 +2261,9 @@ window.onclick = (event) => {
         modalLogin.style.display = "none";
     }
 };
-    // ============================================
+}); // fin de DOMContentLoaded
+
+// ============================================
 // IMPORTADOR DE EXCEL
 // ============================================
 
@@ -2579,45 +2602,7 @@ async function confirmarImportacion() {
 }
 
 
-// Renderizar resultado de la importación
-function renderizarResultadoImportar(resultado) {
-    const container = document.getElementById('importar-resultado');
-    if (!container) return;
-    
-    let html = `
-        <div class="resultado-item">
-            <span>Productos importados exitosamente:</span>
-            <span class="resultado-exito">${resultado.exitosos}</span>
-        </div>
-        <div class="resultado-item">
-            <span>Productos con errores:</span>
-            <span class="resultado-error">${resultado.fallidos}</span>
-        </div>
-    `;
-    
-    if (resultado.errores.length > 0) {
-        html += `<div style="margin-top:16px;">
-            <strong style="color:#dc2626;">Errores:</strong>
-            <ul style="margin-top:8px; padding-left:20px; font-size:0.8rem; color:#64748b;">
-        `;
-        resultado.errores.slice(0, 10).forEach(err => {
-            html += `<li>${err}</li>`;
-        });
-        if (resultado.errores.length > 10) {
-            html += `<li>... y ${resultado.errores.length - 10} errores más</li>`;
-        }
-        html += `</ul></div>`;
-    }
-    
-    container.innerHTML = html;
-}
 
-// Volver al paso 1
-function volverAlPaso1() {
-    mostrarPasoImportar(1);
-    document.getElementById('importar-archivo').value = '';
-    document.getElementById('importar-info').textContent = '';
-}
 
 // Inicializar el importador (conectar botones)
 function inicializarImportador() {
@@ -2658,7 +2643,6 @@ function inicializarImportador() {
     }
 }
 
-});
 // Llenar el select de marcas del importador
 function llenarSelectMarcaImportar() {
     const select = document.getElementById('importar-marca');
@@ -3062,205 +3046,13 @@ function renderizarListaCategoriasAdmin() {
     });
 }
 
-// Renderizar lista de marcas en el panel admin
-function renderizarListaMarcasAdmin() {
-    const container = document.getElementById('lista-marcas');
-    if (!container) return;
 
-    const marcas = BrandService.getCache();
-    container.innerHTML = '';
 
-    if (marcas.length === 0) {
-        container.innerHTML = '<p style="color:#94a3b8; font-size:0.875rem;">No hay marcas registradas</p>';
-        return;
-    }
 
-    marcas.forEach(marca => {
-        const div = document.createElement('div');
-        div.className = 'categoria-item';
-        div.innerHTML = `
-            ${marca.nombre}
-            <button data-id="${marca.id}" class="btn-eliminar-marca">X</button>
-        `;
-        container.appendChild(div);
-    });
 
-    container.querySelectorAll('.btn-eliminar-marca').forEach(btn => {
-        btn.addEventListener('click', () => {
-            eliminarMarca(btn.dataset.id);
-        });
-    });
-}
 
-// Agregar marca
-async function agregarMarca() {
-    const input = document.getElementById('nueva-marca-nombre');
-    if (!input) return;
 
-    const nombre = input.value.trim();
 
-    if (!nombre) {
-        alert('Ingresa el nombre de la marca');
-        return;
-    }
-
-    const resultado = await BrandService.crear(nombre);
-
-    if (!resultado.ok) {
-        alert('Error al crear la marca: ' + resultado.error);
-        return;
-    }
-
-    if (resultado.reactivada) {
-        alert('Marca reactivada correctamente');
-    } else if (resultado.yaExistia) {
-        alert('Esa marca ya existe y está activa');
-    } else {
-        alert('Marca agregada correctamente');
-    }
-
-    input.value = '';
-    renderizarListaMarcasAdmin();
-    actualizarSelectMarcas();
-}
-
-// Eliminar marca
-async function eliminarMarca(id) {
-    if (!confirm('¿Eliminar esta marca? Los productos que la tengan quedarán sin marca.')) {
-        return;
-    }
-
-    try {
-        const { error } = await window.sb
-            .from('marcas')
-            .update({ activa: false })
-            .eq('id', id);
-
-        if (error) {
-            alert('Error al eliminar: ' + error.message);
-            return;
-        }
-
-        alert('Marca eliminada');
-
-        await BrandService.listar();
-
-        renderizarListaMarcasAdmin();
-        actualizarSelectMarcas();
-
-    } catch (err) {
-        console.error(err);
-        alert('Error inesperado');
-    }
-}
-
-// Eliminar categoría
-async function eliminarCategoria(id) {
-    if (!confirm('¿Eliminar esta categoría? Los productos que la tengan quedarán sin categoría.')) {
-        return;
-    }
-
-    try {
-        const { error } = await window.sb
-            .from('categorias')
-            .update({ activa: false })
-            .eq('id', id);
-
-        if (error) {
-            alert('Error al eliminar: ' + error.message);
-            return;
-        }
-
-        alert('Categoría eliminada');
-
-        await CategoryService.listar();
-
-        renderizarListaCategoriasAdmin();
-        actualizarSelectCategorias();
-        llenarSelectCategoriaImportar();
-        renderizarCategorias();
-
-    } catch (err) {
-        console.error(err);
-        alert('Error inesperado');
-    }
-}
-
-// Actualizar select de categorías en el formulario de agregar producto
-function actualizarSelectCategorias() {
-    const select = document.getElementById('nueva-categoria');
-    if (!select) return;
-
-    const categorias = CategoryService.getCache();
-    const valorActual = select.value;
-
-    select.innerHTML = '<option value="">Seleccionar categoria</option>';
-
-    categorias.forEach(cat => {
-        const option = document.createElement('option');
-        option.value = cat.id;
-        option.textContent = `${cat.icono ? cat.icono + ' ' : ''}${cat.nombre}`;
-        select.appendChild(option);
-    });
-
-    if (valorActual && categorias.some(c => c.id === valorActual)) {
-        select.value = valorActual;
-    }
-}
-
-// Actualizar select de marcas en el formulario
-function actualizarSelectMarcas() {
-    const select = document.getElementById('nueva-marca');
-    if (!select) return;
-
-    const marcas = BrandService.getCache();
-    const valorActual = select.value;
-
-    select.innerHTML = '<option value="">Seleccionar marca</option>';
-
-    marcas.forEach(marca => {
-        const option = document.createElement('option');
-        option.value = marca.id;
-        option.textContent = marca.nombre;
-        select.appendChild(option);
-    });
-
-    if (valorActual && marcas.some(m => m.id === valorActual)) {
-        select.value = valorActual;
-    }
-}
-
-// Llenar select de marcas del importador
-function llenarSelectMarcaImportar() {
-    const select = document.getElementById('importar-marca');
-    if (!select) return;
-
-    const marcas = BrandService.getCache();
-    select.innerHTML = '<option value="">Seleccionar marca</option>';
-
-    marcas.forEach(marca => {
-        const option = document.createElement('option');
-        option.value = marca.id;
-        option.textContent = marca.nombre;
-        select.appendChild(option);
-    });
-}
-
-// Llenar select de categorías del importador
-function llenarSelectCategoriaImportar() {
-    const select = document.getElementById('importar-categoria');
-    if (!select) return;
-
-    const categorias = CategoryService.getCache();
-    select.innerHTML = '<option value="">Seleccionar categoría</option>';
-
-    categorias.forEach(cat => {
-        const option = document.createElement('option');
-        option.value = cat.id;
-        option.textContent = cat.nombre;
-        select.appendChild(option);
-    });
-}
 
 // Volver al paso 1 del importador
 function volverAlPaso1() {
@@ -3308,96 +3100,8 @@ function renderizarResultadoImportar(resultado) {
     container.innerHTML = html;
 }
 
-// Inicializar importador (conectar botones)
-function inicializarImportador() {
-    const btnNuevaMarca = document.getElementById('btn-nueva-marca-importar');
-    if (btnNuevaMarca) {
-        btnNuevaMarca.onclick = crearMarcaDesdeImportador;
-    }
 
-    const btnNuevaCategoria = document.getElementById('btn-nueva-categoria-importar');
-    if (btnNuevaCategoria) {
-        btnNuevaCategoria.onclick = crearCategoriaDesdeImportador;
-    }
 
-    const btnProcesar = document.getElementById('btn-procesar-excel');
-    if (btnProcesar) {
-        btnProcesar.onclick = procesarExcel;
-    }
-
-    const btnConfirmar = document.getElementById('btn-confirmar-importar');
-    if (btnConfirmar) {
-        btnConfirmar.onclick = confirmarImportacion;
-    }
-
-    const btnCancelar = document.getElementById('btn-cancelar-importar');
-    if (btnCancelar) {
-        btnCancelar.onclick = volverAlPaso1;
-    }
-
-    const btnVolver = document.getElementById('btn-volver-importar');
-    if (btnVolver) {
-        btnVolver.onclick = volverAlPaso1;
-    }
-}
-
-// Crear marca nueva desde el importador
-async function crearMarcaDesdeImportador() {
-    const nombre = prompt("Nombre de la nueva marca:");
-    if (!nombre || !nombre.trim()) return;
-
-    const resultado = await BrandService.crear(nombre.trim());
-
-    if (!resultado.ok) {
-        alert("Error al crear marca: " + resultado.error);
-        return;
-    }
-
-    if (resultado.yaExistia) {
-        alert("Esa marca ya existía y fue seleccionada");
-    } else if (resultado.reactivada) {
-        alert("Marca reactivada y seleccionada");
-    } else {
-        alert("Marca creada correctamente");
-    }
-
-    renderizarListaMarcasAdmin();
-    actualizarSelectMarcas();
-    llenarSelectMarcaImportar();
-
-    const select = document.getElementById('importar-marca');
-    if (select && resultado.data) {
-        select.value = resultado.data.id;
-    }
-}
-
-// Crear categoría nueva desde el importador
-async function crearCategoriaDesdeImportador() {
-    const nombre = prompt("Nombre de la nueva categoría:");
-    if (!nombre || !nombre.trim()) return;
-
-    const resultado = await CategoryService.crear(nombre.trim());
-
-    if (!resultado.ok) {
-        alert("Error al crear categoría: " + resultado.error);
-        return;
-    }
-
-    if (resultado.yaExistia) {
-        alert("Esa categoría ya existía y fue seleccionada");
-    } else {
-        alert("Categoría creada correctamente");
-    }
-
-    renderizarListaCategoriasAdmin();
-    actualizarSelectCategorias();
-    llenarSelectCategoriaImportar();
-
-    const select = document.getElementById('importar-categoria');
-    if (select && resultado.data) {
-        select.value = resultado.data.id;
-    }
-}
 // ============================================
 // GESTIÓN DE USUARIOS (PANEL ADMIN)
 // ============================================

@@ -1,5 +1,6 @@
 # Dependencias
 node_modules/
+.npm-cache/
 
 # Temporales de la CLI de Supabase (contienen refs locales del proyecto)
 supabase/.temp/
@@ -7,6 +8,7 @@ supabase/.temp/
 # Logs
 *.log
 npm-debug.log*
+.lint-baseline.txt
 
 # Entorno
 .env
